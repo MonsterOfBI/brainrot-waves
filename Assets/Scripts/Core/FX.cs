@@ -1,0 +1,240 @@
+using UnityEngine;
+
+namespace BrainrotWaves
+{
+    /// <summary>Визуальные эффекты: взрывы, осколки, цифры урона, вспышки, тряска камеры.</summary>
+    public static class FX
+    {
+        static Font font;
+
+        public static Font Font
+        {
+            get
+            {
+                if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                return font;
+            }
+        }
+
+        /// <summary>Разлёт цветных кусочков (смерть врага, попадание).</summary>
+        public static void Burst(Vector3 position, Color color, int count, float speed, float size, float life = 0.8f)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                var piece = GameObject.CreatePrimitive(i % 2 == 0 ? PrimitiveType.Cube : PrimitiveType.Sphere);
+                Object.DestroyImmediate(piece.GetComponent<Collider>());
+                piece.transform.position = position + Random.insideUnitSphere * size;
+                piece.transform.localScale = Vector3.one * size * Random.Range(0.6f, 1.2f);
+                piece.transform.rotation = Random.rotation;
+                var r = piece.GetComponent<Renderer>();
+                r.sharedMaterial = GameAssets.Lit(color);
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                var dir = Random.insideUnitSphere;
+                dir.y = Mathf.Abs(dir.y) + 0.3f;
+                var debris = piece.AddComponent<Debris>();
+                debris.velocity = dir.normalized * speed * Random.Range(0.5f, 1.2f);
+                debris.life = life * Random.Range(0.7f, 1.2f);
+            }
+        }
+
+        /// <summary>Огненный шар взрыва с кольцом и дымом.</summary>
+        public static void Explosion(Vector3 position, float radius, Color color)
+        {
+            var ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Object.DestroyImmediate(ball.GetComponent<Collider>());
+            ball.transform.position = position;
+            var r = ball.GetComponent<Renderer>();
+            r.sharedMaterial = GameAssets.Glow(color, 3f);
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var grow = ball.AddComponent<GrowFade>();
+            grow.from = radius * 0.3f;
+            grow.to = radius * 2f;
+            grow.life = 0.35f;
+
+            var lightObject = new GameObject("ExplosionLight");
+            lightObject.transform.position = position + Vector3.up;
+            var light = lightObject.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = color;
+            light.range = radius * 4f;
+            light.intensity = 6f;
+            lightObject.AddComponent<LightFade>().life = 0.35f;
+
+            Burst(position, new Color(0.25f, 0.22f, 0.2f), 8, radius * 3f, 0.4f, 1f);
+            Burst(position, color, 6, radius * 4f, 0.25f, 0.6f);
+            CameraShake.AddAt(position, 0.5f, radius * 6f);
+            SoundFX.Play(SoundFX.Sfx.Explosion, 0.9f, 0.15f);
+        }
+
+        /// <summary>Кольцо по земле (удары, способности).</summary>
+        public static void Ring(Vector3 position, float radius, Color color, float life = 0.4f)
+        {
+            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.DestroyImmediate(ring.GetComponent<Collider>());
+            ring.transform.position = new Vector3(position.x, position.y + 0.05f, position.z);
+            var r = ring.GetComponent<Renderer>();
+            r.sharedMaterial = GameAssets.Glow(color, 2f);
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var grow = ring.AddComponent<GrowFade>();
+            grow.from = 0.5f;
+            grow.to = radius * 2f;
+            grow.flat = true;
+            grow.life = life;
+        }
+
+        /// <summary>Летящая вверх цифра урона.</summary>
+        public static void DamageNumber(Vector3 position, float amount, bool crit)
+        {
+            var go = new GameObject("DamageNumber");
+            go.transform.position = position + Random.insideUnitSphere * 0.3f;
+            var text = go.AddComponent<TextMesh>();
+            text.font = Font;
+            go.GetComponent<MeshRenderer>().sharedMaterial = Font.material;
+            text.text = Mathf.CeilToInt(amount).ToString() + (crit ? "!" : "");
+            text.fontSize = 64;
+            text.characterSize = crit ? 0.07f : 0.05f;
+            text.anchor = TextAnchor.MiddleCenter;
+            text.color = crit ? new Color(1f, 0.85f, 0.1f) : Color.white;
+            go.AddComponent<FloatingText>();
+        }
+
+        public static void Text(Vector3 position, string message, Color color, float size = 0.06f)
+        {
+            var go = new GameObject("FloatingText");
+            go.transform.position = position;
+            var text = go.AddComponent<TextMesh>();
+            text.font = Font;
+            go.GetComponent<MeshRenderer>().sharedMaterial = Font.material;
+            text.text = message;
+            text.fontSize = 64;
+            text.characterSize = size;
+            text.anchor = TextAnchor.MiddleCenter;
+            text.color = color;
+            var f = go.AddComponent<FloatingText>();
+            f.life = 1.2f;
+        }
+    }
+
+    /// <summary>Осколок: летит, падает, уменьшается и исчезает.</summary>
+    public class Debris : MonoBehaviour
+    {
+        public Vector3 velocity;
+        public float life = 0.8f;
+        float age;
+        Vector3 startScale;
+        Vector3 spin;
+
+        void Start()
+        {
+            startScale = transform.localScale;
+            spin = Random.insideUnitSphere * 720f;
+        }
+
+        void Update()
+        {
+            age += Time.deltaTime;
+            velocity.y -= 18f * Time.deltaTime;
+            transform.position += velocity * Time.deltaTime;
+            if (transform.position.y < 0.05f)
+            {
+                transform.position = new Vector3(transform.position.x, 0.05f, transform.position.z);
+                velocity *= 0.5f;
+                velocity.y = Mathf.Abs(velocity.y) * 0.3f;
+            }
+            transform.Rotate(spin * Time.deltaTime);
+            float t = age / life;
+            transform.localScale = startScale * Mathf.Clamp01(1f - t * t);
+            if (age >= life) Destroy(gameObject);
+        }
+    }
+
+    /// <summary>Объект растёт и исчезает (взрывы, кольца).</summary>
+    public class GrowFade : MonoBehaviour
+    {
+        public float from = 0.5f;
+        public float to = 3f;
+        public float life = 0.4f;
+        public bool flat;
+        float age;
+
+        void Update()
+        {
+            age += Time.deltaTime;
+            float t = Mathf.Clamp01(age / life);
+            float s = Mathf.Lerp(from, to, 1f - (1f - t) * (1f - t));
+            float fade = 1f - t;
+            transform.localScale = flat ? new Vector3(s, 0.03f, s) : Vector3.one * s * (0.3f + 0.7f * fade);
+            if (age >= life) Destroy(gameObject);
+        }
+    }
+
+    public class LightFade : MonoBehaviour
+    {
+        public float life = 0.3f;
+        float age;
+        Light lightComponent;
+        float startIntensity;
+
+        void Start()
+        {
+            lightComponent = GetComponent<Light>();
+            startIntensity = lightComponent.intensity;
+        }
+
+        void Update()
+        {
+            age += Time.deltaTime;
+            lightComponent.intensity = startIntensity * Mathf.Clamp01(1f - age / life);
+            if (age >= life) Destroy(gameObject);
+        }
+    }
+
+    /// <summary>Текст, который всплывает, смотрит в камеру и исчезает.</summary>
+    public class FloatingText : MonoBehaviour
+    {
+        public float life = 0.8f;
+        float age;
+        TextMesh text;
+        Color startColor;
+        Vector3 velocity;
+
+        void Start()
+        {
+            text = GetComponent<TextMesh>();
+            startColor = text.color;
+            velocity = new Vector3(Random.Range(-0.6f, 0.6f), 2.5f, Random.Range(-0.6f, 0.6f));
+        }
+
+        void Update()
+        {
+            age += Time.deltaTime;
+            velocity.y -= 3f * Time.deltaTime;
+            transform.position += velocity * Time.deltaTime;
+            var cam = Camera.main;
+            if (cam != null) transform.rotation = Quaternion.LookRotation(transform.position - cam.transform.position);
+            float t = age / life;
+            text.color = new Color(startColor.r, startColor.g, startColor.b, 1f - t * t);
+            if (age >= life) Destroy(gameObject);
+        }
+    }
+
+    /// <summary>Тряска камеры игрока.</summary>
+    public static class CameraShake
+    {
+        public static float trauma;
+
+        public static void Add(float amount)
+        {
+            trauma = Mathf.Clamp01(trauma + amount);
+        }
+
+        /// <summary>Тряска, ослабевающая с расстоянием до игрока.</summary>
+        public static void AddAt(Vector3 position, float amount, float range)
+        {
+            var cam = Camera.main;
+            if (cam == null) return;
+            float d = Vector3.Distance(cam.transform.position, position);
+            Add(amount * Mathf.Clamp01(1f - d / Mathf.Max(range, 0.1f)));
+        }
+    }
+}

@@ -6,8 +6,10 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/Arena.unity
-    guid: 564efa44eec87ae4ba54bbf53b086a3c
-  m_configObjects:
-    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    path: Assets/Scenes/MainMenu.unity
+    guid: e8f7271ea8f1dce48a3b3153050c6bb1
+  - enabled: 1
+    path: Assets/Scenes/Game.unity
+    guid: 8eecfe01af9e8e74eb6d3b27710a82cf
+  m_configObjects: {}
   m_UseUCBPForAssetBundles: 0
