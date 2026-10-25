@@ -71,7 +71,7 @@ namespace BrainrotWaves
             go.transform.position = spawnPosition;
 
             var hp = go.AddComponent<Health>();
-            hp.maxHealth = health;
+            hp.SetMax(health, true); // Awake уже выставил 100, поэтому задаём максимум и заполняем заново
 
             var collider = go.AddComponent<CapsuleCollider>();
             collider.radius = 0.6f * size;

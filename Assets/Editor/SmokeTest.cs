@@ -76,7 +76,7 @@ namespace BrainrotWaves.EditorTools
                         Note("Spawned " + info.id + " at " + e.transform.position);
                         i++;
                     }
-                    Enemy.Create(BrainrotId.TungTung, p + Vector3.forward * 15f, true, 500f, 1f);
+                    var bossCheck = Enemy.Create(BrainrotId.TungTung, p + Vector3.forward * 15f, true, 500f, 1f); Note("Boss hp " + bossCheck.Health.Current + " / " + bossCheck.Health.maxHealth);
                     Enemy.Create(BrainrotId.Bombardiro, p + Vector3.back * 15f, true, 500f, 1f);
                     Enemy.Create(BrainrotId.Chimpanzini, p + Vector3.left * 15f, true, 500f, 1f);
                     Note("Enemies active: " + Enemy.Active.Count);
