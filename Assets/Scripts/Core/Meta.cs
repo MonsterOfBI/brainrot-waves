@@ -302,6 +302,8 @@ namespace BrainrotWaves
             if (profile.labRanks == null) profile.labRanks = new List<int>();
             if (profile.unlockedHeroes == null) profile.unlockedHeroes = new List<int>();
             while (profile.labRanks.Count < profile.labKeys.Count) profile.labRanks.Add(0);
+            // Победы из старой версии игры открывают первый уровень угрозы
+            if (profile.wins > 0 && profile.threatUnlocked == 0) profile.threatUnlocked = 1;
         }
 
         public static void Save()

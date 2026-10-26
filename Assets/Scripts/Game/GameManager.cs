@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering.Universal;
 
 namespace BrainrotWaves
 {
@@ -104,6 +105,21 @@ namespace BrainrotWaves
             cam.nearClipPlane = 0.03f;
             cam.farClipPlane = 400f;
             cameraObject.AddComponent<AudioListener>();
+
+            // Отдельная камера для оружия в руках: своё постоянное поле зрения,
+            // чтобы пистолет не растягивался при широком угле обзора и не проходил сквозь стены
+            cam.cullingMask &= ~(1 << WeaponSystem.ViewmodelLayer);
+            var vmObject = new GameObject("ViewmodelCamera");
+            vmObject.transform.SetParent(cameraObject.transform, false);
+            var vm = vmObject.AddComponent<Camera>();
+            vm.fieldOfView = 62f;
+            vm.nearClipPlane = 0.01f;
+            vm.farClipPlane = 5f;
+            vm.cullingMask = 1 << WeaponSystem.ViewmodelLayer;
+            var vmData = vm.GetUniversalAdditionalCameraData();
+            vmData.renderType = UnityEngine.Rendering.Universal.CameraRenderType.Overlay;
+            vmData.renderShadows = false;
+            cam.GetUniversalAdditionalCameraData().cameraStack.Add(vm);
 
             Player = playerObject.AddComponent<PlayerController>();
             Player.cameraPivot = pivot;
@@ -361,6 +377,7 @@ namespace BrainrotWaves
         IEnumerator BossIntro(Enemy boss, BrainrotInfo owner)
         {
             CutsceneActive = true;
+            ui.SetLetterbox(true);
             ClearProjectiles();
             Enemy.TimeScale = 0f;
             Player.InputEnabled = false;

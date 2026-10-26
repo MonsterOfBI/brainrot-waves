@@ -133,8 +133,8 @@ namespace BrainrotWaves
             canvas = UIKit.Canvas("MenuCanvas", 10);
             var root = canvas;
 
-            var title = UIKit.Text(root, "Title", "BRAINROT WAVES", 110, TextAnchor.UpperLeft, UIKit.Accent, true);
-            UIKit.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(70f, -40f), new Vector2(1200f, 140f));
+            var title = UIKit.Text(root, "Title", "BRAINROT WAVES", 88, TextAnchor.UpperLeft, UIKit.Accent, true);
+            UIKit.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(70f, -50f), new Vector2(820f, 120f));
             title.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(6f, -6f);
             title.gameObject.AddComponent<Wobble>();
             var subtitle = UIKit.Text(root, "Subtitle", new LS("Шутер с волнами итальянских брейнротов", "A wave shooter with Italian brainrots"), 34, TextAnchor.UpperLeft, Color.white);

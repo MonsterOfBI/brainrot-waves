@@ -476,6 +476,9 @@ namespace BrainrotWaves
             bannerTimer = 0f;
         }
 
+        /// <summary>Чёрные полосы кино и скрытый интерфейс на время заставки.</summary>
+        public void SetLetterbox(bool on) => letterboxTarget = on ? 1f : 0f;
+
         public void HideBossIntro()
         {
             letterboxTarget = 0f;

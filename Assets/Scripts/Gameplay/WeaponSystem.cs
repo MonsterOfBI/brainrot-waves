@@ -27,6 +27,15 @@ namespace BrainrotWaves
         public event Action Hit;
         public event Action<bool> HitCrit;
 
+        /// <summary>Слой оружия в руках (рисуется отдельной камерой).</summary>
+        public const int ViewmodelLayer = 10;
+
+        static void SetLayer(Transform t, int layer)
+        {
+            t.gameObject.layer = layer;
+            for (int i = 0; i < t.childCount; i++) SetLayer(t.GetChild(i), layer);
+        }
+
         static readonly Vector3 RestPosition = new Vector3(0.26f, -0.24f, 0.42f);
         const float HolsterTime = 0.14f;
         const float DrawTime = 0.3f;
@@ -118,6 +127,7 @@ namespace BrainrotWaves
             var slot = new Slot { def = def, ammo = MagSize(def) };
             slot.model = BuildModel(def, out slot.muzzle, out slot.mag);
             if (slot.mag != null) slot.magRest = slot.mag.localPosition;
+            SetLayer(holder, ViewmodelLayer);
             slot.model.gameObject.SetActive(false);
             slots.Add(slot);
             if (!RunState.ownedWeapons.Contains(id)) RunState.ownedWeapons.Add(id);
@@ -273,6 +283,7 @@ namespace BrainrotWaves
         {
             if (slot.mag == null) return;
             var copy = Instantiate(slot.mag.gameObject);
+            copy.layer = 0;
             copy.transform.SetPositionAndRotation(slot.mag.position, slot.mag.rotation);
             copy.transform.localScale = slot.mag.lossyScale;
             var debris = copy.AddComponent<Debris>();
