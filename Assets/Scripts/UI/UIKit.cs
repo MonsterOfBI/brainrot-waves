@@ -113,10 +113,11 @@ namespace BrainrotWaves
         {
             var rect = Rect(parent, name);
             var text = rect.gameObject.AddComponent<Text>();
-            text.font = FX.Font;
+            bool title = bold && size >= 44;
+            text.font = title ? FX.TitleFont : FX.Font;
             text.text = value;
             text.fontSize = size;
-            text.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
+            text.fontStyle = bold && !title ? FontStyle.Bold : FontStyle.Normal;
             text.alignment = anchor;
             text.color = color ?? Color.white;
             text.raycastTarget = false;

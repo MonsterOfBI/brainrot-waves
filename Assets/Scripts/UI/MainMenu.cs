@@ -36,7 +36,8 @@ namespace BrainrotWaves
             BuildStage();
             BuildUI();
             SelectHero(selected);
-            SoundFX.PlayMusic(0);
+            SoundFX.PlayMusic(SoundFX.MenuMusic);
+            SoundFX.PlayAmbient(null);
             Loc.Changed += RebuildUI;
         }
 
@@ -225,6 +226,9 @@ namespace BrainrotWaves
 
             var quit = UIKit.IconButton(root, "Quit", IconKind.Exit, new LS("Выход", "Quit"), new Color(0.3f, 0.2f, 0.4f, 0.9f), Quit, 26);
             UIKit.Place(quit.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(-60f, 30f), new Vector2(210f, 60f), new Vector2(1f, 0f));
+
+            var credits = UIKit.IconButton(root, "Credits", IconKind.Star, new LS("Авторы", "Credits"), new Color(0.3f, 0.2f, 0.4f, 0.9f), ShowCredits, 26);
+            UIKit.Place(credits.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(-290f, 30f), new Vector2(210f, 60f), new Vector2(1f, 0f));
 
             overlay = UIKit.Rect(root, "Overlay");
             UIKit.Stretch(overlay);
@@ -460,6 +464,26 @@ namespace BrainrotWaves
                 Rebuild();
             }, 24);
             UIKit.Place(refund.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(200f, 40f), new Vector2(380f, 80f), new Vector2(0.5f, 0f));
+        }
+
+        // ---------------- Авторы ----------------
+
+        void ShowCredits()
+        {
+            for (int i = overlay.childCount - 1; i >= 0; i--) Destroy(overlay.GetChild(i).gameObject);
+            var screen = UIKit.Image(overlay, "Credits", new Color(0.02f, 0.01f, 0.06f, 0.94f), false);
+            screen.raycastTarget = true;
+            UIKit.Stretch(screen.rectTransform);
+            screen.gameObject.AddComponent<ScreenIntro>();
+            var sr = screen.rectTransform;
+            var title = UIKit.Text(sr, "Title", new LS("АВТОРЫ", "CREDITS"), 70, TextAnchor.MiddleCenter, UIKit.Accent, true);
+            UIKit.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(1400f, 90f), new Vector2(0.5f, 1f));
+            string text = Loc.T("<b>Brainrot Waves</b>\n\n<color=#FFC93C>3D-модели, звуки, частицы</color>\nKenney (kenney.nl) — CC0\n\n<color=#FFC93C>Шрифты</color>\nRubik, Russo One — SIL Open Font License\n\n<color=#FFC93C>Музыка и звуки окружения</color>\nPixabay — Pixabay Content License\n\n<color=#FFC93C>Спасибо</color>\nвсем авторам бесплатных ассетов!",
+                "<b>Brainrot Waves</b>\n\n<color=#FFC93C>3D models, sounds, particles</color>\nKenney (kenney.nl) — CC0\n\n<color=#FFC93C>Fonts</color>\nRubik, Russo One — SIL Open Font License\n\n<color=#FFC93C>Music and ambience</color>\nPixabay — Pixabay Content License\n\n<color=#FFC93C>Thanks</color>\nto all authors of free assets!");
+            var body = UIKit.Text(sr, "Body", text, 30, TextAnchor.UpperCenter, Color.white);
+            UIKit.Place(body.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -180f), new Vector2(1500f, 700f), new Vector2(0.5f, 1f));
+            var back = UIKit.IconButton(sr, "Back", IconKind.Back, new LS("Назад", "Back"), UIKit.Purple, () => Destroy(screen.gameObject), 32);
+            UIKit.Place(back.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0f, 50f), new Vector2(340f, 80f), new Vector2(0.5f, 0f));
         }
 
         void Update()

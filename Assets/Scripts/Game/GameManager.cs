@@ -57,6 +57,7 @@ namespace BrainrotWaves
         {
             if (Instance == this) Instance = null;
             Enemy.AnyDied -= OnEnemyDied;
+            SoundFX.PlayAmbient(null);
             Time.timeScale = 1f;
             Enemy.TimeScale = 1f;
         }
@@ -221,6 +222,7 @@ namespace BrainrotWaves
             Player.Teleport(arena.PlayerSpawn, 0f);
             Boss = null;
             Particles.Ambient(owner.arena, Player.transform);
+            SoundFX.PlayAmbient(owner.arena);
             if (PostFX.Instance != null) PostFX.Instance.ApplyTheme(owner.arena);
         }
 
@@ -558,7 +560,7 @@ namespace BrainrotWaves
             choosing = true;
             bool done = false;
             OpenScreen();
-            SoundFX.PlayMusic(0);
+            SoundFX.PlayMusic(SoundFX.MenuMusic);
             var counts = new Dictionary<string, int>();
             int a = RunState.arenaIndex;
 

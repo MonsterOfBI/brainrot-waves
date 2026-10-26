@@ -11,7 +11,14 @@ namespace BrainrotWaves
         static Particles instance;
         static Texture2D dotTexture, leafTexture;
 
-        ParticleSystem sparks, smoke, dust, glow, leaves;
+        ParticleSystem sparks, smoke, dust, glow, leaves, stars;
+
+        /// <summary>Текстура из Kenney Particle Pack (Resources/ParticleTex), иначе запасная из кода.</summary>
+        static Texture Tex(string name, Texture fallback)
+        {
+            var t = Resources.Load<Texture2D>("ParticleTex/" + name);
+            return t != null ? t : fallback;
+        }
         ParticleSystem ambient, ambientMist;
         Transform follow;
 
@@ -113,20 +120,28 @@ namespace BrainrotWaves
             trail.velocityScale = 0.04f;
             trail.lengthScale = 1.5f;
 
-            smoke = NewSystem("Smoke", false, DotTexture, -0.05f, 600);
+            smoke = NewSystem("Smoke", false, Tex("smoke_04", DotTexture), -0.05f, 600);
             var sol = smoke.sizeOverLifetime;
             sol.enabled = true;
             sol.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 0.6f, 1f, 1.8f));
 
-            dust = NewSystem("Dust", false, DotTexture, 0.3f, 600);
+            dust = NewSystem("Dust", false, Tex("smoke_04", DotTexture), 0.3f, 600);
             var dsol = dust.sizeOverLifetime;
             dsol.enabled = true;
             dsol.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 0.7f, 1f, 1.5f));
 
-            glow = NewSystem("Glow", true, DotTexture, 0f, 800);
+            glow = NewSystem("Glow", true, Tex("light_01", DotTexture), 0f, 800);
             var gsol = glow.sizeOverLifetime;
             gsol.enabled = true;
             gsol.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 1f, 1f, 0f));
+
+            stars = NewSystem("Stars", true, Tex("star_06", DotTexture), 0.6f, 600);
+            var ssol = stars.sizeOverLifetime;
+            ssol.enabled = true;
+            ssol.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 1f, 1f, 0f));
+            var srot = stars.rotationOverLifetime;
+            srot.enabled = true;
+            srot.z = new ParticleSystem.MinMaxCurve(-3f, 3f);
 
             leaves = NewSystem("Leaves", false, LeafTexture, 0.4f, 400);
             var rot = leaves.rotationOverLifetime;
@@ -237,7 +252,7 @@ namespace BrainrotWaves
         {
             var s = I;
             for (int i = 0; i < Scaled(count); i++)
-                Emit(s.glow, position + Random.insideUnitSphere * 0.2f, Random.insideUnitSphere * speed, color, size * Random.Range(0.6f, 1.3f), Random.Range(0.3f, 0.8f));
+                Emit(s.stars, position + Random.insideUnitSphere * 0.2f, Random.insideUnitSphere * speed, color, size * 1.6f * Random.Range(0.6f, 1.3f), Random.Range(0.3f, 0.8f), Random.Range(0f, 360f));
         }
 
         /// <summary>Огненный шар взрыва из частиц.</summary>

@@ -463,8 +463,92 @@ namespace BrainrotWaves
 
         // ---------- Модели оружия ----------
 
+        /// <summary>Модель из Kenney Blaster Kit (Resources/Weapons) для оружия.</summary>
+        static string KitModel(WeaponId id)
+        {
+            switch (id)
+            {
+                case WeaponId.Rifle: return "blaster-p";
+                case WeaponId.Shotgun: return "blaster-l";
+                default: return "blaster-k";
+            }
+        }
+
+        static float KitLength(WeaponId id) => id == WeaponId.Rifle ? 0.5f : id == WeaponId.Shotgun ? 0.44f : 0.3f;
+
+        /// <summary>Поворот моделей Kenney, чтобы ствол смотрел вперёд (+Z).</summary>
+        public static float KitYaw = 180f;
+
+        static bool id0(WeaponDef def) => def.id == WeaponId.Pistol;
+
+        static Bounds LocalBounds(Transform root, GameObject model)
+        {
+            var b = new Bounds();
+            bool first = true;
+            var toRoot = root.worldToLocalMatrix;
+            foreach (var mf in model.GetComponentsInChildren<MeshFilter>())
+            {
+                if (mf.sharedMesh == null) continue;
+                var m = toRoot * mf.transform.localToWorldMatrix;
+                var mb = mf.sharedMesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var c = mb.center + Vector3.Scale(mb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                    var p = m.MultiplyPoint3x4(c);
+                    if (first) { b = new Bounds(p, Vector3.zero); first = false; }
+                    else b.Encapsulate(p);
+                }
+            }
+            return b;
+        }
+
+        Transform BuildKitModel(WeaponDef def, GameObject prefab, out Transform muzzle, out Transform mag)
+        {
+            var root = new GameObject(def.name.en).transform;
+            root.SetParent(holder, false);
+            var pivot = new GameObject("Pivot").transform;
+            pivot.SetParent(root, false);
+            pivot.localRotation = Quaternion.Euler(0f, KitYaw, 0f);
+            var model = Instantiate(prefab, pivot, false);
+            foreach (var r in model.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            // Масштаб по длине и центровка: рукоять примерно в точке крепления
+            var b = LocalBounds(root, model);
+            float length = Mathf.Max(0.01f, Mathf.Max(b.size.z, b.size.y * 1.7f));
+            float scale = KitLength(def.id) / length;
+            pivot.localScale = Vector3.one * scale;
+            b = LocalBounds(root, model);
+            pivot.localPosition = -new Vector3(b.center.x, b.center.y - (id0(def) ? b.size.y * 0.12f : 0f), b.center.z - b.size.z * 0.25f);
+            b = LocalBounds(root, model);
+
+            muzzle = Muzzle(root, new Vector3(0f, b.center.y + b.size.y * 0.15f, b.max.z));
+            mag = null;
+            if (def.id != WeaponId.Shotgun)
+            {
+                var clip = Resources.Load<GameObject>("Weapons/clip-small");
+                if (clip != null)
+                {
+                    var holderT = new GameObject("Mag").transform;
+                    holderT.SetParent(root, false);
+                    var c = Instantiate(clip, holderT, false);
+                    foreach (var r in c.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    var cb = LocalBounds(holderT, c);
+                    float cs = 0.09f / Mathf.Max(0.01f, cb.size.y);
+                    c.transform.localScale = Vector3.one * cs;
+                    cb = LocalBounds(holderT, c);
+                    c.transform.localPosition = -cb.center;
+                    holderT.localPosition = new Vector3(0f, b.min.y + 0.025f, b.center.z - b.size.z * 0.05f);
+                    mag = holderT;
+                }
+            }
+            return root;
+        }
+
         Transform BuildModel(WeaponDef def, out Transform muzzle, out Transform mag)
         {
+            var kit = Resources.Load<GameObject>("Weapons/" + KitModel(def.id));
+            if (kit != null) return BuildKitModel(def, kit, out muzzle, out mag);
+
             var root = new GameObject(def.name.en).transform;
             root.SetParent(holder, false);
             Color dark = GameAssets.Hex("#2B2D33");

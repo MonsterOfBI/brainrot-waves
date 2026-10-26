@@ -5,14 +5,27 @@ namespace BrainrotWaves
     /// <summary>Визуальные эффекты: взрывы, осколки, цифры урона, вспышки, тряска камеры.</summary>
     public static class FX
     {
-        static Font font;
+        static Font font, titleFont;
 
+        /// <summary>Основной шрифт (Rubik, есть кириллица). Если файла нет — встроенный.</summary>
         public static Font Font
         {
             get
             {
+                if (font == null) font = Resources.Load<Font>("Fonts/Rubik");
                 if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 return font;
+            }
+        }
+
+        /// <summary>Шрифт заголовков и цифр урона (Russo One).</summary>
+        public static Font TitleFont
+        {
+            get
+            {
+                if (titleFont == null) titleFont = Resources.Load<Font>("Fonts/RussoOne");
+                if (titleFont == null) titleFont = Font;
+                return titleFont;
             }
         }
 
@@ -91,8 +104,8 @@ namespace BrainrotWaves
             var go = new GameObject("DamageNumber");
             go.transform.position = position + Random.insideUnitSphere * 0.3f;
             var text = go.AddComponent<TextMesh>();
-            text.font = Font;
-            go.GetComponent<MeshRenderer>().sharedMaterial = Font.material;
+            text.font = TitleFont;
+            go.GetComponent<MeshRenderer>().sharedMaterial = TitleFont.material;
             text.text = Mathf.CeilToInt(amount).ToString() + (crit ? "!" : "");
             text.fontSize = 64;
             text.characterSize = crit ? 0.07f : 0.05f;

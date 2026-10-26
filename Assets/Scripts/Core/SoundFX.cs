@@ -32,6 +32,7 @@ namespace BrainrotWaves
             MasterVolume = GameSettings.MasterVolume * GameSettings.SfxVolume;
             MusicVolume = GameSettings.MasterVolume * GameSettings.MusicVolume * 0.6f;
             if (instance != null && instance.music != null) instance.music.volume = MusicVolume;
+            if (instance != null && instance.ambient != null) instance.ambient.volume = MasterVolume * 0.35f;
         }
 
         public static SoundFX I
@@ -88,12 +89,40 @@ namespace BrainrotWaves
             clips[Sfx.WaveStart] = Arp(new[] { 392f, 392f, 587f }, 0.12f, Wave.Square, 0.4f);
             clips[Sfx.Victory] = Arp(new[] { 523f, 659f, 784f, 1046f, 784f, 1046f, 1318f }, 0.13f, Wave.Square, 0.4f);
             clips[Sfx.Defeat] = Arp(new[] { 392f, 349f, 311f, 262f }, 0.22f, Wave.Saw, 0.4f);
+
+            // Настоящие звуки (Kenney, CC0) из Resources/Audio/<Имя>: если есть — используются вместо звуков из кода
+            foreach (Sfx sfx in System.Enum.GetValues(typeof(Sfx)))
+            {
+                var loaded = Resources.LoadAll<AudioClip>("Audio/" + sfx);
+                if (loaded != null && loaded.Length > 0) variants[sfx] = loaded;
+            }
+
+            ambient = gameObject.AddComponent<AudioSource>();
+            ambient.loop = true;
+            ambient.playOnAwake = false;
+            ambient.ignoreListenerPause = true;
+        }
+
+        readonly Dictionary<Sfx, AudioClip[]> variants = new Dictionary<Sfx, AudioClip[]>();
+        AudioSource ambient;
+
+        /// <summary>Стиль музыки главного меню и магазина.</summary>
+        public const int MenuMusic = 50;
+
+        /// <summary>Имя файла музыки в Resources/Music для стиля.</summary>
+        static string MusicFile(int style)
+        {
+            if (style == MenuMusic) return "menu";
+            if (style >= 100) return "boss";
+            return "arena_" + (ArenaTheme)(style % 100);
         }
 
         public static void Play(Sfx sfx, float volume = 1f, float pitchVariation = 0.05f)
         {
             var self = I;
-            if (!self.clips.TryGetValue(sfx, out var clip)) return;
+            AudioClip clip;
+            if (self.variants.TryGetValue(sfx, out var list)) clip = list[Random.Range(0, list.Length)];
+            else if (!self.clips.TryGetValue(sfx, out clip)) return;
             var source = self.pool[self.nextSource];
             self.nextSource = (self.nextSource + 1) % self.pool.Count;
             source.pitch = 1f + Random.Range(-pitchVariation, pitchVariation);
@@ -106,7 +135,8 @@ namespace BrainrotWaves
             var self = I;
             if (!self.musicCache.TryGetValue(style, out var clip))
             {
-                clip = self.GenerateMusic(style);
+                clip = Resources.Load<AudioClip>("Music/" + MusicFile(style));
+                if (clip == null) clip = self.GenerateMusic(style);
                 self.musicCache[style] = clip;
             }
             if (self.music.clip == clip && self.music.isPlaying) return;
@@ -118,6 +148,28 @@ namespace BrainrotWaves
         public static void StopMusic()
         {
             if (instance != null) instance.music.Stop();
+        }
+
+        /// <summary>Фоновые звуки арены (прибой, ветер, сверчки...) из Resources/Ambient/<тема>. Null — выключить.</summary>
+        public static void PlayAmbient(ArenaTheme? theme)
+        {
+            if (theme == null && instance == null) return;
+            var self = I;
+            if (theme == null)
+            {
+                self.ambient.Stop();
+                return;
+            }
+            var clip = Resources.Load<AudioClip>("Ambient/" + theme.Value);
+            if (clip == null)
+            {
+                self.ambient.Stop();
+                return;
+            }
+            if (self.ambient.clip == clip && self.ambient.isPlaying) return;
+            self.ambient.clip = clip;
+            self.ambient.volume = MasterVolume * 0.35f;
+            self.ambient.Play();
         }
 
         // ---------------- Генерация ----------------
@@ -237,6 +289,7 @@ namespace BrainrotWaves
         /// <summary>Генерирует зацикленную мелодию в стиле «итальянской» чиптюн-музыки.</summary>
         AudioClip GenerateMusic(int style)
         {
+            if (style == MenuMusic) style = 0;
             var rng = new System.Random(1234 + style * 97);
             bool boss = style >= 100;
             int baseStyle = style % 100;

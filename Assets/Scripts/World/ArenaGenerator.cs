@@ -8,7 +8,7 @@ namespace BrainrotWaves
     /// <summary>
     /// Строит тематическую арену из простых фигур: пляж, лес, джунгли, пустыня, город, ночная деревня.
     /// </summary>
-    public class ArenaGenerator
+    public partial class ArenaGenerator
     {
         public Transform Root { get; private set; }
         public readonly List<Vector3> spawnPoints = new List<Vector3>();
@@ -133,6 +133,7 @@ namespace BrainrotWaves
                 default: BuildNightVillage(); break;
             }
 
+            AddKitDecor(theme);
             BuildPortals(theme);
             ApplyLighting(theme, sun, cam);
 
