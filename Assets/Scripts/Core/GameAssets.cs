@@ -15,6 +15,8 @@ namespace BrainrotWaves
         public Material litTransparent;
         public Material unlit;
         public Material skybox;
+        public Material particleAlpha;
+        public Material particleAdditive;
 
         static GameAssets instance;
         static readonly Dictionary<long, Material> cache = new Dictionary<long, Material>();

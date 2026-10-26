@@ -7,6 +7,7 @@ namespace BrainrotWaves
 {
     /// <summary>
     /// Оружие героя. ЛКМ — стрелять, R — перезарядка, 1/2/3 или колесо — сменить оружие.
+    /// Анимации: смена оружия (убрать/достать), перезарядка с выпадающим магазином, отдача.
     /// </summary>
     public class WeaponSystem : MonoBehaviour
     {
@@ -16,6 +17,8 @@ namespace BrainrotWaves
             public int ammo;
             public Transform model;
             public Transform muzzle;
+            public Transform mag;        // магазин (у дробовика — цевьё)
+            public Vector3 magRest;
         }
 
         public Camera cam;
@@ -24,14 +27,22 @@ namespace BrainrotWaves
         public event Action Hit;
         public event Action<bool> HitCrit;
 
+        static readonly Vector3 RestPosition = new Vector3(0.26f, -0.24f, 0.42f);
+        const float HolsterTime = 0.14f;
+        const float DrawTime = 0.3f;
+
         readonly List<Slot> slots = new List<Slot>();
         int current;
+        int pending = -1;
         bool reloading;
         float reloadTimer;
         float reloadDuration;
         float nextFireTime;
         float recoil;
         float switchTimer;
+        float holsterTimer;
+        bool magDropped;
+        int shellsShown;
         Vector2 sway;
         Transform holder;
         Light muzzleLight;
@@ -44,10 +55,12 @@ namespace BrainrotWaves
         public int Ammo => slots.Count > 0 ? slots[current].ammo : 0;
         public int MagazineSize => MagSize(CurrentDef);
         public bool IsReloading => reloading;
+        public bool IsSwitching => switchTimer > 0f || holsterTimer > 0f;
         public float ReloadProgress => reloading && reloadDuration > 0f ? 1f - reloadTimer / reloadDuration : 0f;
         public int SlotCount => slots.Count;
         public int CurrentIndex => current;
         public WeaponId SlotId(int i) => slots[i].def.id;
+        public int SlotAmmo(int i) => slots[i].ammo;
 
         static int MagSize(WeaponDef def) => Mathf.CeilToInt(def.magazine * RunState.stats.magazineMultiplier);
 
@@ -55,7 +68,7 @@ namespace BrainrotWaves
         {
             holder = new GameObject("WeaponHolder").transform;
             holder.SetParent(transform, false);
-            holder.localPosition = new Vector3(0.26f, -0.24f, 0.42f);
+            holder.localPosition = RestPosition;
 
             var flash = BrainrotModels.Part(holder, PrimitiveType.Sphere, Vector3.zero, Vector3.one * 0.15f, Color.white, default, 0.5f, false);
             flash.GetComponent<Renderer>().sharedMaterial = GameAssets.Glow(new Color(1f, 0.8f, 0.3f), 4f);
@@ -79,7 +92,7 @@ namespace BrainrotWaves
                 line.endWidth = 0.01f;
                 line.useWorldSpace = true;
                 line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                line.sharedMaterial = GameAssets.Unlit(new Color(1f, 0.92f, 0.5f));
+                line.sharedMaterial = GameAssets.Glow(new Color(1f, 0.92f, 0.5f), 2.5f);
                 line.enabled = false;
                 tracers.Add(line);
                 tracerTimers.Add(0f);
@@ -103,11 +116,13 @@ namespace BrainrotWaves
             }
             var def = WeaponDef.Get(id);
             var slot = new Slot { def = def, ammo = MagSize(def) };
-            slot.model = BuildModel(def, out slot.muzzle);
+            slot.model = BuildModel(def, out slot.muzzle, out slot.mag);
+            if (slot.mag != null) slot.magRest = slot.mag.localPosition;
             slot.model.gameObject.SetActive(false);
             slots.Add(slot);
             if (!RunState.ownedWeapons.Contains(id)) RunState.ownedWeapons.Add(id);
-            if (select || slots.Count == 1) Select(slots.Count - 1);
+            if (slots.Count == 1) DoSelect(0);
+            else if (select) Select(slots.Count - 1);
         }
 
         public void RefillAll()
@@ -115,15 +130,36 @@ namespace BrainrotWaves
             foreach (var s in slots) s.ammo = MagSize(s.def);
         }
 
+        /// <summary>Начать смену оружия: сначала убираем текущее, потом достаём новое.</summary>
         void Select(int index)
         {
             if (index < 0 || index >= slots.Count) return;
-            if (slots.Count > 0 && current < slots.Count) slots[current].model.gameObject.SetActive(false);
+            if (index == current && holsterTimer <= 0f) return;
+            pending = index;
+            if (holsterTimer <= 0f) holsterTimer = HolsterTime;
+            CancelReload();
+        }
+
+        void DoSelect(int index)
+        {
+            if (index < 0 || index >= slots.Count) return;
+            if (current < slots.Count) slots[current].model.gameObject.SetActive(false);
             current = index;
             slots[current].model.gameObject.SetActive(true);
-            reloading = false;
-            switchTimer = 0.25f;
+            CancelReload();
+            switchTimer = DrawTime;
             SoundFX.Play(SoundFX.Sfx.Reload, 0.4f);
+        }
+
+        void CancelReload()
+        {
+            reloading = false;
+            magDropped = false;
+            if (slots.Count > 0 && slots[current].mag != null)
+            {
+                slots[current].mag.localPosition = slots[current].magRest;
+                slots[current].mag.gameObject.SetActive(true);
+            }
         }
 
         void Update()
@@ -132,30 +168,40 @@ namespace BrainrotWaves
             UpdateFlash();
             if (slots.Count == 0) return;
 
+            if (holsterTimer > 0f)
+            {
+                holsterTimer -= Time.deltaTime;
+                if (holsterTimer <= 0f)
+                {
+                    holsterTimer = 0f;
+                    DoSelect(pending);
+                }
+            }
+
             var player = PlayerController.Instance;
             bool canControl = Time.timeScale > 0f && player != null && player.InputEnabled && !player.Health.IsDead && PlayerController.IsCursorLocked;
             var mouse = Mouse.current;
-            var keyboard = Keyboard.current;
 
-            if (canControl && keyboard != null && mouse != null)
+            if (canControl && mouse != null)
             {
-                if (keyboard.digit1Key.wasPressedThisFrame) Select(0);
-                if (keyboard.digit2Key.wasPressedThisFrame && slots.Count > 1) Select(1);
-                if (keyboard.digit3Key.wasPressedThisFrame && slots.Count > 2) Select(2);
+                if (Controls.Down(GameAction.Weapon1)) Select(0);
+                if (Controls.Down(GameAction.Weapon2) && slots.Count > 1) Select(1);
+                if (Controls.Down(GameAction.Weapon3) && slots.Count > 2) Select(2);
                 float scroll = mouse.scroll.ReadValue().y;
+                int baseIndex = holsterTimer > 0f ? pending : current;
                 if (Mathf.Abs(scroll) > 0.1f && slots.Count > 1)
-                    Select((current + (scroll < 0f ? 1 : slots.Count - 1)) % slots.Count);
+                    Select((baseIndex + (scroll < 0f ? 1 : slots.Count - 1)) % slots.Count);
 
-                if (keyboard.rKey.wasPressedThisFrame) StartReload();
+                if (Controls.Down(GameAction.Reload)) StartReload();
 
                 var def = CurrentDef;
                 bool trigger = def.automatic ? mouse.leftButton.isPressed : mouse.leftButton.wasPressedThisFrame;
-                if (trigger && switchTimer <= 0f && Time.time >= nextFireTime)
+                if (trigger && !IsSwitching && Time.time >= nextFireTime)
                 {
                     if (reloading)
                     {
                         // Дробовик можно прервать выстрелом, если есть патроны
-                        if (def.id == WeaponId.Shotgun && slots[current].ammo > 0) reloading = false;
+                        if (def.id == WeaponId.Shotgun && slots[current].ammo > 0) CancelReload();
                     }
                     if (!reloading)
                     {
@@ -175,8 +221,10 @@ namespace BrainrotWaves
         void StartReload()
         {
             var slot = slots[current];
-            if (reloading || slot.ammo >= MagSize(slot.def)) return;
+            if (reloading || IsSwitching || slot.ammo >= MagSize(slot.def)) return;
             reloading = true;
+            magDropped = false;
+            shellsShown = 0;
             reloadDuration = slot.def.reloadTime * RunState.stats.reloadTimeMultiplier;
             reloadTimer = reloadDuration;
             SoundFX.Play(SoundFX.Sfx.Reload, 0.6f);
@@ -186,12 +234,50 @@ namespace BrainrotWaves
         {
             if (!reloading) return;
             reloadTimer -= Time.deltaTime;
+            var slot = slots[current];
+            float p = ReloadProgress;
+
+            // Шаги перезарядки со звуками
+            if (slot.def.id == WeaponId.Shotgun)
+            {
+                int shells = Mathf.FloorToInt(Mathf.InverseLerp(0.15f, 0.8f, p) * 3f);
+                if (shells > shellsShown && shellsShown < 3)
+                {
+                    shellsShown = shells;
+                    SoundFX.Play(SoundFX.Sfx.Empty, 0.5f, 0.15f);
+                }
+            }
+            else if (!magDropped && p > 0.3f)
+            {
+                magDropped = true;
+                DropMagazine(slot);
+                SoundFX.Play(SoundFX.Sfx.Empty, 0.45f, 0.1f);
+            }
+
             if (reloadTimer <= 0f)
             {
                 reloading = false;
-                slots[current].ammo = MagSize(slots[current].def);
+                slot.ammo = MagSize(slot.def);
+                if (slot.mag != null)
+                {
+                    slot.mag.localPosition = slot.magRest;
+                    slot.mag.gameObject.SetActive(true);
+                }
+                recoil = Mathf.Max(recoil, 0.8f); // «передёрнуть затвор»
                 SoundFX.Play(SoundFX.Sfx.Reload, 0.6f);
             }
+        }
+
+        /// <summary>Пустой магазин выпадает и падает вниз.</summary>
+        void DropMagazine(Slot slot)
+        {
+            if (slot.mag == null) return;
+            var copy = Instantiate(slot.mag.gameObject);
+            copy.transform.SetPositionAndRotation(slot.mag.position, slot.mag.rotation);
+            copy.transform.localScale = slot.mag.lossyScale;
+            var debris = copy.AddComponent<Debris>();
+            debris.velocity = cam.transform.TransformDirection(new Vector3(0.3f, -1.5f, 0.6f));
+            debris.life = 0.9f;
         }
 
         void Fire()
@@ -214,7 +300,10 @@ namespace BrainrotWaves
             flashTimer = 0.05f;
             muzzleFlash.position = slot.muzzle.position;
             muzzleFlash.localScale = Vector3.one * (def.id == WeaponId.Shotgun ? 0.28f : 0.16f) * UnityEngine.Random.Range(0.8f, 1.2f);
+            muzzleFlash.localRotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
             muzzleLight.transform.position = slot.muzzle.position;
+            Particles.Flash(slot.muzzle.position, new Color(1f, 0.75f, 0.3f), def.id == WeaponId.Shotgun ? 0.5f : 0.3f, 0.05f);
+            Particles.Smoke(slot.muzzle.position + cam.transform.forward * 0.1f, def.id == WeaponId.Shotgun ? 0.18f : 0.08f, def.id == WeaponId.Shotgun ? 3 : 1, new Color(0.85f, 0.85f, 0.85f, 0.25f));
 
             bool anyHit = false, anyCrit = false;
             for (int p = 0; p < def.pellets; p++)
@@ -233,12 +322,15 @@ namespace BrainrotWaves
                         bool crit = UnityEngine.Random.value < stats.critChance;
                         float damage = def.damage * stats.damageMultiplier * (crit ? 2f : 1f);
                         enemy.TakeHit(damage, crit, hit.point);
+                        if (!enemy.IsDead) enemy.Knockback(dir * (def.id == WeaponId.Shotgun ? 1.2f : 0.5f));
                         anyHit = true;
                         anyCrit |= crit;
                     }
                     else
                     {
-                        FX.Burst(hit.point + hit.normal * 0.05f, new Color(0.85f, 0.8f, 0.7f), 2, 3f, 0.06f, 0.4f);
+                        FX.Burst(hit.point + hit.normal * 0.05f, new Color(0.85f, 0.8f, 0.7f), 1, 3f, 0.06f, 0.4f);
+                        Particles.Sparks(hit.point + hit.normal * 0.03f, hit.normal, new Color(1f, 0.85f, 0.5f), 4, 5f);
+                        Particles.Dust(hit.point, 0.25f, 2, new Color(0.7f, 0.65f, 0.6f));
                     }
                 }
                 ShowTracer(slot.muzzle.position, end);
@@ -285,6 +377,8 @@ namespace BrainrotWaves
             muzzleLight.intensity = on ? 4f : 0f;
         }
 
+        static float Bump(float p, float a, float b) => Mathf.Sin(Mathf.Clamp01(Mathf.InverseLerp(a, b, p)) * Mathf.PI);
+
         void AnimateModel()
         {
             var player = PlayerController.Instance;
@@ -294,20 +388,73 @@ namespace BrainrotWaves
             switchTimer = Mathf.Max(0f, switchTimer - Time.deltaTime);
 
             Vector3 bob = new Vector3(Mathf.Cos(t * 0.5f) * 0.012f, Mathf.Abs(Mathf.Sin(t * 0.5f)) * 0.015f, 0f) * move;
-            Vector3 position = new Vector3(0.26f, -0.24f, 0.42f) + bob + new Vector3(sway.x, sway.y, 0f);
+            Vector3 position = RestPosition + bob + new Vector3(sway.x, sway.y, 0f);
             position += new Vector3(0f, recoil * 0.015f, -recoil * 0.06f);
-            position.y -= switchTimer * 1.2f;
+            Vector3 euler = new Vector3(-recoil * 6f, sway.x * 40f, -sway.x * 60f);
 
-            float reloadTilt = reloading ? Mathf.Sin(ReloadProgress * Mathf.PI) * 40f : 0f;
+            // Смена оружия: старое уходит вниз, новое поднимается с поворотом
+            if (holsterTimer > 0f)
+            {
+                float h = 1f - holsterTimer / HolsterTime;
+                position.y -= Ease.InOutCubic(h) * 0.35f;
+                euler += new Vector3(Ease.InOutCubic(h) * 35f, 0f, -h * 20f);
+            }
+            else if (switchTimer > 0f)
+            {
+                float d = 1f - Ease.OutBack(1f - switchTimer / DrawTime);
+                position.y -= d * 0.35f;
+                euler += new Vector3(d * 35f, 0f, d * 25f);
+            }
+
+            // Перезарядка
+            if (reloading && slots.Count > 0)
+            {
+                var slot = slots[current];
+                float p = ReloadProgress;
+                float tilt = Bump(p, 0f, 1f);
+                if (slot.def.id == WeaponId.Shotgun)
+                {
+                    // Поворот набок, по одному патрону — толчок, в конце — передёрнуть цевьё
+                    euler += new Vector3(-10f * tilt, 0f, 35f * tilt);
+                    position += new Vector3(-0.04f, 0.02f, 0f) * tilt;
+                    float shell = Mathf.Repeat(Mathf.InverseLerp(0.15f, 0.8f, p) * 3f, 1f);
+                    if (p > 0.15f && p < 0.8f) position.z -= Mathf.Sin(shell * Mathf.PI) * 0.025f;
+                    if (slot.mag != null) slot.mag.localPosition = slot.magRest + new Vector3(0f, 0f, -0.12f * Bump(p, 0.82f, 1f));
+                }
+                else
+                {
+                    // Наклон, магазин выезжает вниз, новый вставляется, затвор
+                    euler += new Vector3(-15f * tilt, 10f * tilt, 28f * tilt);
+                    position += new Vector3(-0.03f, 0.03f, 0.02f) * tilt;
+                    if (slot.mag != null)
+                    {
+                        if (p < 0.3f)
+                        {
+                            slot.mag.gameObject.SetActive(true);
+                            slot.mag.localPosition = slot.magRest + Vector3.down * Ease.InOutCubic(Mathf.InverseLerp(0.1f, 0.3f, p)) * 0.08f;
+                        }
+                        else if (p < 0.45f) slot.mag.gameObject.SetActive(false);
+                        else
+                        {
+                            slot.mag.gameObject.SetActive(true);
+                            float insert = Ease.OutCubic(Mathf.InverseLerp(0.45f, 0.72f, p));
+                            slot.mag.localPosition = slot.magRest + Vector3.down * (1f - insert) * 0.25f;
+                            if (p > 0.72f) position.y += Bump(p, 0.72f, 0.8f) * 0.02f;
+                        }
+                    }
+                    position.z -= Bump(p, 0.82f, 0.95f) * 0.04f;
+                }
+            }
+
             holder.localPosition = position;
-            holder.localRotation = Quaternion.Euler(-recoil * 6f + reloadTilt, sway.x * 40f, -sway.x * 60f + reloadTilt * 0.5f);
+            holder.localRotation = Quaternion.Euler(euler);
         }
 
         // ---------- Модели оружия ----------
 
-        Transform BuildModel(WeaponDef def, out Transform muzzle)
+        Transform BuildModel(WeaponDef def, out Transform muzzle, out Transform mag)
         {
-            var root = new GameObject(def.name).transform;
+            var root = new GameObject(def.name.en).transform;
             root.SetParent(holder, false);
             Color dark = GameAssets.Hex("#2B2D33");
             Color mid = GameAssets.Hex("#4A4E57");
@@ -320,7 +467,7 @@ namespace BrainrotWaves
                     P(root, new Vector3(0f, 0f, 0.05f), new Vector3(0.08f, 0.11f, 0.5f), dark);
                     P(root, new Vector3(0f, 0.015f, 0.42f), new Vector3(0.04f, 0.04f, 0.35f), mid);
                     P(root, new Vector3(0f, -0.02f, 0.3f), new Vector3(0.07f, 0.07f, 0.2f), accent);
-                    P(root, new Vector3(0f, -0.13f, 0.08f), new Vector3(0.06f, 0.18f, 0.08f), dark, new Vector3(12f, 0f, 0f));
+                    mag = P(root, new Vector3(0f, -0.13f, 0.08f), new Vector3(0.06f, 0.18f, 0.08f), dark, new Vector3(12f, 0f, 0f));
                     P(root, new Vector3(0f, -0.11f, -0.07f), new Vector3(0.06f, 0.14f, 0.07f), wood, new Vector3(-15f, 0f, 0f));
                     P(root, new Vector3(0f, -0.02f, -0.25f), new Vector3(0.07f, 0.1f, 0.18f), wood);
                     P(root, new Vector3(0f, 0.08f, 0.05f), new Vector3(0.03f, 0.04f, 0.12f), accent);
@@ -330,7 +477,7 @@ namespace BrainrotWaves
                     P(root, new Vector3(0f, 0f, 0.1f), new Vector3(0.09f, 0.1f, 0.42f), dark);
                     P(root, new Vector3(-0.022f, 0.02f, 0.45f), new Vector3(0.04f, 0.04f, 0.4f), mid);
                     P(root, new Vector3(0.022f, 0.02f, 0.45f), new Vector3(0.04f, 0.04f, 0.4f), mid);
-                    P(root, new Vector3(0f, -0.04f, 0.38f), new Vector3(0.08f, 0.06f, 0.18f), wood);
+                    mag = P(root, new Vector3(0f, -0.04f, 0.38f), new Vector3(0.08f, 0.06f, 0.18f), wood);
                     P(root, new Vector3(0f, -0.05f, -0.2f), new Vector3(0.08f, 0.12f, 0.3f), wood, new Vector3(8f, 0f, 0f));
                     P(root, new Vector3(0f, 0.06f, 0.1f), new Vector3(0.1f, 0.02f, 0.3f), accent);
                     muzzle = Muzzle(root, new Vector3(0f, 0.02f, 0.66f));
@@ -339,6 +486,7 @@ namespace BrainrotWaves
                     P(root, new Vector3(0f, 0.02f, 0.05f), new Vector3(0.07f, 0.08f, 0.26f), dark);
                     P(root, new Vector3(0f, 0.03f, 0.2f), new Vector3(0.045f, 0.045f, 0.1f), mid);
                     P(root, new Vector3(0f, -0.08f, -0.03f), new Vector3(0.06f, 0.15f, 0.08f), accent, new Vector3(-12f, 0f, 0f));
+                    mag = P(root, new Vector3(0f, -0.15f, -0.045f), new Vector3(0.045f, 0.05f, 0.06f), mid, new Vector3(-12f, 0f, 0f));
                     P(root, new Vector3(0f, 0.07f, -0.04f), new Vector3(0.02f, 0.02f, 0.05f), accent);
                     muzzle = Muzzle(root, new Vector3(0f, 0.03f, 0.27f));
                     break;
@@ -346,9 +494,9 @@ namespace BrainrotWaves
             return root;
         }
 
-        static void P(Transform parent, Vector3 position, Vector3 scale, Color color, Vector3 euler = default)
+        static Transform P(Transform parent, Vector3 position, Vector3 scale, Color color, Vector3 euler = default)
         {
-            BrainrotModels.Part(parent, PrimitiveType.Cube, position, scale, color, euler, 0.6f, false);
+            return BrainrotModels.Part(parent, PrimitiveType.Cube, position, scale, color, euler, 0.6f, false);
         }
 
         static Transform Muzzle(Transform parent, Vector3 position)

@@ -58,6 +58,7 @@ namespace BrainrotWaves
             Health.Damaged += (amount, crit) =>
             {
                 CameraShake.Add(Mathf.Clamp(amount / 40f, 0.15f, 0.5f));
+                PostFX.Hurt(Mathf.Clamp(amount / 30f, 0.3f, 0.8f));
                 SoundFX.Play(SoundFX.Sfx.Hurt, 0.8f, 0.1f);
             };
         }
@@ -79,7 +80,7 @@ namespace BrainrotWaves
         public void ApplyStats(bool refill)
         {
             var stats = RunState.stats;
-            Health.SetMax(RunState.HeroInfo.heroMaxHealth + stats.bonusMaxHealth, refill);
+            Health.SetMax((RunState.HeroInfo.heroMaxHealth + stats.bonusMaxHealth) * stats.maxHealthMultiplier, refill);
             Health.damageTakenMultiplier = stats.damageTakenMultiplier;
         }
 
@@ -109,6 +110,7 @@ namespace BrainrotWaves
 
         void Update()
         {
+            if (cam != null && Time.timeScale == 0f) cam.fieldOfView = GameSettings.Fov;
             if (Health.IsDead || Time.timeScale == 0f) return;
             float dt = Time.deltaTime;
             var stats = RunState.stats;
@@ -133,15 +135,15 @@ namespace BrainrotWaves
             {
                 Vector2 look = mouse.delta.ReadValue() * MouseSensitivity;
                 transform.Rotate(0f, look.x, 0f);
-                pitch = Mathf.Clamp(pitch - look.y, -85f, 85f);
+                pitch = Mathf.Clamp(pitch + (GameSettings.InvertY ? look.y : -look.y), -85f, 85f);
 
-                if (keyboard.wKey.isPressed) input.y += 1f;
-                if (keyboard.sKey.isPressed) input.y -= 1f;
-                if (keyboard.dKey.isPressed) input.x += 1f;
-                if (keyboard.aKey.isPressed) input.x -= 1f;
+                if (Controls.Held(GameAction.Forward)) input.y += 1f;
+                if (Controls.Held(GameAction.Back)) input.y -= 1f;
+                if (Controls.Held(GameAction.Right)) input.x += 1f;
+                if (Controls.Held(GameAction.Left)) input.x -= 1f;
                 input = Vector2.ClampMagnitude(input, 1f);
-                sprint = keyboard.leftShiftKey.isPressed && input.y > 0.1f;
-                jumpPressed = keyboard.spaceKey.wasPressedThisFrame;
+                sprint = Controls.Held(GameAction.Sprint) && input.y > 0.1f;
+                jumpPressed = Controls.Down(GameAction.Jump);
             }
 
             float speed = baseSpeed * stats.moveSpeedMultiplier * slowMultiplier * (sprint ? sprintMultiplier : 1f);
@@ -176,7 +178,11 @@ namespace BrainrotWaves
             move.y = verticalVelocity;
             controller.Move(move * dt);
             IsGrounded = controller.isGrounded;
-            if (IsGrounded && !wasGrounded && verticalVelocity < -8f) landDip = 0.12f;
+            if (IsGrounded && !wasGrounded && verticalVelocity < -8f)
+            {
+                landDip = 0.12f;
+                Particles.Dust(transform.position, 0.6f, 6, new Color(0.75f, 0.7f, 0.62f));
+            }
 
             UpdateCamera(dt);
         }
@@ -204,6 +210,7 @@ namespace BrainrotWaves
             cam.transform.localRotation = Quaternion.Euler(shakeRotation);
 
             fovKick = Mathf.MoveTowards(fovKick, 0f, dt * 30f);
+            baseFov = GameSettings.Fov;
             cam.fieldOfView = baseFov + fovKick + (MoveFraction > 0.85f ? 4f : 0f);
         }
     }

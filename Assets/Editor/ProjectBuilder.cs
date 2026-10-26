@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace BrainrotWaves.EditorTools
 {
@@ -17,6 +18,13 @@ namespace BrainrotWaves.EditorTools
         const string MenuScene = "Assets/Scenes/MainMenu.unity";
         const string GameScene = "Assets/Scenes/Game.unity";
         const string MaterialsFolder = "Assets/Materials";
+        const string PostProfilePath = "Assets/Resources/PostFXProfile.asset";
+
+        static bool NeedsParticles()
+        {
+            var a = AssetDatabase.LoadAssetAtPath<GameAssets>(AssetsPath);
+            return a == null || a.particleAlpha == null || a.particleAdditive == null;
+        }
 
         static ProjectBuilder()
         {
@@ -28,7 +36,7 @@ namespace BrainrotWaves.EditorTools
             if (Application.isBatchMode) return;
             if (SessionState.GetBool("BW_SetupChecked", false)) return;
             SessionState.SetBool("BW_SetupChecked", true);
-            if (!File.Exists(AssetsPath) || !File.Exists(MenuScene) || !File.Exists(GameScene))
+            if (!File.Exists(AssetsPath) || !File.Exists(MenuScene) || !File.Exists(GameScene) || !File.Exists(PostProfilePath) || NeedsParticles())
             {
                 Setup();
                 EditorSceneManager.OpenScene(MenuScene);
@@ -44,6 +52,7 @@ namespace BrainrotWaves.EditorTools
 
             SetupLayers();
             CreateGameAssets();
+            CreatePostProfile();
             CreateScenes();
             AssetDatabase.SaveAssets();
             Debug.Log("Brainrot Waves: проект настроен. Откройте сцену MainMenu и нажмите Play.");
@@ -131,7 +140,57 @@ namespace BrainrotWaves.EditorTools
             assets.litTransparent = transparent;
             assets.unlit = unlit;
             assets.skybox = skybox;
+            assets.particleAlpha = SaveMaterial("ParticleAlpha", ParticleMaterial(false));
+            assets.particleAdditive = SaveMaterial("ParticleAdditive", ParticleMaterial(true));
             EditorUtility.SetDirty(assets);
+        }
+
+        static Material ParticleMaterial(bool additive)
+        {
+            var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            var m = new Material(shader);
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", additive ? 2f : 0f);
+            m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", additive ? (float)BlendMode.One : (float)BlendMode.OneMinusSrcAlpha);
+            if (m.HasProperty("_SrcBlendAlpha")) m.SetFloat("_SrcBlendAlpha", (float)BlendMode.One);
+            if (m.HasProperty("_DstBlendAlpha")) m.SetFloat("_DstBlendAlpha", additive ? (float)BlendMode.One : (float)BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_ZWrite", 0f);
+            m.SetFloat("_Cull", 0f);
+            m.SetOverrideTag("RenderType", "Transparent");
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.renderQueue = (int)RenderQueue.Transparent;
+            return m;
+        }
+
+        /// <summary>Профиль пост-обработки: значения подстраиваются кодом под каждую арену.</summary>
+        static void CreatePostProfile()
+        {
+            var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(PostProfilePath);
+            if (profile == null)
+            {
+                profile = ScriptableObject.CreateInstance<VolumeProfile>();
+                AssetDatabase.CreateAsset(profile, PostProfilePath);
+            }
+            Add<Bloom>(profile, b => { b.threshold.Override(0.95f); b.intensity.Override(0.8f); b.scatter.Override(0.65f); });
+            Add<Tonemapping>(profile, t => t.mode.Override(TonemappingMode.Neutral));
+            Add<ColorAdjustments>(profile, c => { c.postExposure.Override(0.15f); c.contrast.Override(12f); c.saturation.Override(12f); c.colorFilter.Override(Color.white); });
+            Add<Vignette>(profile, v => { v.intensity.Override(0.22f); v.smoothness.Override(0.45f); });
+            Add<ChromaticAberration>(profile, c => c.intensity.Override(0f));
+            Add<LiftGammaGain>(profile, l => { l.lift.Override(new Vector4(1f, 1f, 1f, 0f)); l.gain.Override(new Vector4(1f, 1f, 1f, 0f)); });
+            EditorUtility.SetDirty(profile);
+        }
+
+        static void Add<T>(VolumeProfile profile, System.Action<T> setup) where T : VolumeComponent
+        {
+            if (!profile.TryGet(out T component))
+            {
+                component = profile.Add<T>(true);
+                component.name = typeof(T).Name;
+                AssetDatabase.AddObjectToAsset(component, profile);
+            }
+            setup(component);
+            EditorUtility.SetDirty(component);
         }
 
         static void CreateScenes()

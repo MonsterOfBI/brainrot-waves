@@ -60,8 +60,10 @@ namespace BrainrotWaves
             light.intensity = 6f;
             lightObject.AddComponent<LightFade>().life = 0.35f;
 
-            Burst(position, new Color(0.25f, 0.22f, 0.2f), 8, radius * 3f, 0.4f, 1f);
-            Burst(position, color, 6, radius * 4f, 0.25f, 0.6f);
+            Burst(position, new Color(0.25f, 0.22f, 0.2f), 5, radius * 3f, 0.35f, 1f);
+            Burst(position, color, 4, radius * 4f, 0.22f, 0.6f);
+            Particles.Fireball(position, radius, color);
+            Particles.Dust(new Vector3(position.x, 0.05f, position.z), radius * 0.6f, 10, new Color(0.55f, 0.5f, 0.45f));
             CameraShake.AddAt(position, 0.5f, radius * 6f);
             SoundFX.Play(SoundFX.Sfx.Explosion, 0.9f, 0.15f);
         }
@@ -85,6 +87,7 @@ namespace BrainrotWaves
         /// <summary>Летящая вверх цифра урона.</summary>
         public static void DamageNumber(Vector3 position, float amount, bool crit)
         {
+            if (!GameSettings.DamageNumbers) return;
             var go = new GameObject("DamageNumber");
             go.transform.position = position + Random.insideUnitSphere * 0.3f;
             var text = go.AddComponent<TextMesh>();
@@ -95,7 +98,8 @@ namespace BrainrotWaves
             text.characterSize = crit ? 0.07f : 0.05f;
             text.anchor = TextAnchor.MiddleCenter;
             text.color = crit ? new Color(1f, 0.85f, 0.1f) : Color.white;
-            go.AddComponent<FloatingText>();
+            var f = go.AddComponent<FloatingText>();
+            f.pop = crit ? 1.8f : 1.3f;
         }
 
         public static void Text(Vector3 position, string message, Color color, float size = 0.06f)
@@ -193,8 +197,10 @@ namespace BrainrotWaves
     public class FloatingText : MonoBehaviour
     {
         public float life = 0.8f;
+        public float pop = 1f;
         float age;
         TextMesh text;
+        Vector3 baseScale = Vector3.one;
         Color startColor;
         Vector3 velocity;
 
@@ -202,6 +208,7 @@ namespace BrainrotWaves
         {
             text = GetComponent<TextMesh>();
             startColor = text.color;
+            baseScale = transform.localScale;
             velocity = new Vector3(Random.Range(-0.6f, 0.6f), 2.5f, Random.Range(-0.6f, 0.6f));
         }
 
@@ -214,6 +221,8 @@ namespace BrainrotWaves
             if (cam != null) transform.rotation = Quaternion.LookRotation(transform.position - cam.transform.position);
             float t = age / life;
             text.color = new Color(startColor.r, startColor.g, startColor.b, 1f - t * t);
+            float popT = Mathf.Clamp01(age / 0.15f);
+            transform.localScale = baseScale * Mathf.Lerp(pop, 1f, Ease.OutCubic(popT));
             if (age >= life) Destroy(gameObject);
         }
     }
@@ -225,7 +234,7 @@ namespace BrainrotWaves
 
         public static void Add(float amount)
         {
-            trauma = Mathf.Clamp01(trauma + amount);
+            trauma = Mathf.Clamp01(trauma + amount * GameSettings.ScreenShake);
         }
 
         /// <summary>Тряска, ослабевающая с расстоянием до игрока.</summary>

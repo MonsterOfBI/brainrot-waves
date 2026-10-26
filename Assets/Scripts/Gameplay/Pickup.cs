@@ -107,14 +107,16 @@ namespace BrainrotWaves
             switch (kind)
             {
                 case Kind.Coin:
-                    RunState.coins += value;
+                    RunState.AddCoins(value);
                     SoundFX.Play(SoundFX.Sfx.Coin, 0.35f, 0.08f);
+                    Particles.Sparkle(transform.position, new Color(1f, 0.85f, 0.3f), 3, 2f, 0.12f);
                     break;
                 case Kind.Health:
                     if (player.Health.Current >= player.Health.maxHealth) return;
                     player.Health.Heal(30f);
                     SoundFX.Play(SoundFX.Sfx.Heal, 0.6f);
                     FX.Text(transform.position + Vector3.up, "+30", new Color(0.4f, 1f, 0.5f));
+                    Particles.Sparkle(transform.position, new Color(0.4f, 1f, 0.5f), 12, 3f, 0.2f);
                     break;
                 case Kind.WeaponCrate:
                     var weapons = player.GetComponentInChildren<WeaponSystem>();
@@ -122,7 +124,7 @@ namespace BrainrotWaves
                     {
                         bool had = weapons.Has(weapon);
                         weapons.Give(weapon, true);
-                        FX.Text(transform.position + Vector3.up * 1.5f, had ? "Патроны!" : WeaponDef.Get(weapon).name + "!", new Color(1f, 0.85f, 0.3f), 0.09f);
+                        FX.Text(transform.position + Vector3.up * 1.5f, had ? Loc.T("Патроны!", "Ammo!") : WeaponDef.Get(weapon).name + "!", new Color(1f, 0.85f, 0.3f), 0.09f);
                     }
                     SoundFX.Play(SoundFX.Sfx.Upgrade, 0.7f);
                     break;

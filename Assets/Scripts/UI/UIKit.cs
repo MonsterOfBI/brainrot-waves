@@ -17,6 +17,11 @@ namespace BrainrotWaves
         public static readonly Color Pink = GameAssets.Hex("#FF5FA2");
         public static readonly Color Cyan = GameAssets.Hex("#3DE0FF");
         public static readonly Color Green = GameAssets.Hex("#5CFF8A");
+        public static readonly Color Purple = GameAssets.Hex("#8E44AD");
+        public static readonly Color Crystal = GameAssets.Hex("#64FFDA");
+        public static readonly Color PlayColor = GameAssets.Hex("#E53977");
+        public static readonly Color OkColor = GameAssets.Hex("#2BB673");
+        public static readonly Color Dim = new Color(0.03f, 0.02f, 0.08f, 0.82f);
 
         /// <summary>Скруглённый прямоугольник, нарисованный кодом (растягивается без искажений).</summary>
         public static Sprite Rounded
@@ -127,6 +132,90 @@ namespace BrainrotWaves
             return text;
         }
 
+        /// <summary>Текст, который сам переводится при смене языка.</summary>
+        public static Text Text(RectTransform parent, string name, LS value, int size, TextAnchor anchor, Color? color = null, bool bold = false, bool outline = true)
+        {
+            var text = Text(parent, name, value.Value, size, anchor, color, bold, outline);
+            var loc = text.gameObject.AddComponent<LocText>();
+            loc.value = value;
+            return text;
+        }
+
+        public static Image Icon(RectTransform parent, string name, IconKind kind, Color color, Vector2 anchor, Vector2 position, float size, Vector2? pivot = null)
+        {
+            var rect = Rect(parent, name);
+            var image = rect.gameObject.AddComponent<Image>();
+            image.sprite = Icons.Get(kind);
+            image.color = color;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            Place(rect, anchor, position, new Vector2(size, size), pivot);
+            return image;
+        }
+
+        /// <summary>Кнопка с иконкой слева от текста.</summary>
+        public static Button IconButton(RectTransform parent, string name, IconKind icon, LS label, Color color, Action onClick, int fontSize = 34)
+        {
+            var b = Button(parent, name, label, color, onClick, fontSize);
+            var rect = b.GetComponent<RectTransform>();
+            var text = rect.GetComponentInChildren<Text>();
+            text.rectTransform.offsetMin = new Vector2(fontSize * 1.9f, text.rectTransform.offsetMin.y);
+            text.alignment = TextAnchor.MiddleLeft;
+            Icon(rect, "Icon", icon, Color.white, new Vector2(0f, 0.5f), new Vector2(fontSize * 0.5f, 0f), fontSize * 1.2f, new Vector2(0f, 0.5f));
+            return b;
+        }
+
+        public static Button Button(RectTransform parent, string name, LS label, Color color, Action onClick, int fontSize = 34)
+        {
+            var b = Button(parent, name, label.Value, color, onClick, fontSize);
+            var text = b.GetComponentInChildren<Text>();
+            text.gameObject.AddComponent<LocText>().value = label;
+            return b;
+        }
+
+        /// <summary>Ползунок (громкость, чувствительность...).</summary>
+        public static Slider Slider(RectTransform parent, string name, float min, float max, float value, Action<float> onChange, Color? fillColor = null)
+        {
+            var root = Rect(parent, name);
+            var slider = root.gameObject.AddComponent<Slider>();
+
+            var back = Image(root, "Background", new Color(0f, 0f, 0f, 0.55f));
+            back.rectTransform.anchorMin = new Vector2(0f, 0.3f);
+            back.rectTransform.anchorMax = new Vector2(1f, 0.7f);
+            back.rectTransform.offsetMin = Vector2.zero;
+            back.rectTransform.offsetMax = Vector2.zero;
+
+            var fillArea = Rect(root, "FillArea");
+            fillArea.anchorMin = new Vector2(0f, 0.3f);
+            fillArea.anchorMax = new Vector2(1f, 0.7f);
+            fillArea.offsetMin = new Vector2(4f, 3f);
+            fillArea.offsetMax = new Vector2(-4f, -3f);
+            var fill = Image(fillArea, "Fill", fillColor ?? Accent);
+            fill.rectTransform.sizeDelta = Vector2.zero;
+
+            var handleArea = Rect(root, "HandleArea");
+            Stretch(handleArea);
+            handleArea.offsetMin = new Vector2(14f, 0f);
+            handleArea.offsetMax = new Vector2(-14f, 0f);
+            var handle = Image(handleArea, "Handle", Color.white);
+            handle.sprite = Circle;
+            handle.raycastTarget = true;
+            handle.rectTransform.sizeDelta = new Vector2(30f, 0f);
+            handle.rectTransform.anchorMin = new Vector2(0f, 0f);
+            handle.rectTransform.anchorMax = new Vector2(0f, 1f);
+
+            back.raycastTarget = true;
+            slider.fillRect = fill.rectTransform;
+            slider.handleRect = handle.rectTransform;
+            slider.targetGraphic = handle;
+            slider.direction = UnityEngine.UI.Slider.Direction.LeftToRight;
+            slider.minValue = min;
+            slider.maxValue = max;
+            slider.value = value;
+            slider.onValueChanged.AddListener(v => onChange?.Invoke(v));
+            return slider;
+        }
+
         public static Button Button(RectTransform parent, string name, string label, Color color, Action onClick, int fontSize = 34)
         {
             var image = Image(parent, name, color);
@@ -185,6 +274,7 @@ namespace BrainrotWaves
 
         void Update()
         {
+            if (GetComponent<PopIn>() != null) return;
             float target = hover ? 1.06f : 1f;
             float s = Mathf.MoveTowards(transform.localScale.x, target, Time.unscaledDeltaTime * 1.5f);
             transform.localScale = Vector3.one * s;

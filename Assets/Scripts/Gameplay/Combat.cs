@@ -53,7 +53,7 @@ namespace BrainrotWaves
                 if (player == null) return;
                 float d = Vector3.Distance(center, player.transform.position + Vector3.up * 0.9f);
                 if (d < radius + 0.4f)
-                    player.Health.TakeDamage(damage * Mathf.Lerp(1f, 0.5f, Mathf.Clamp01(d / radius)));
+                    player.Health.TakeDamageFrom(damage * Mathf.Lerp(1f, 0.5f, Mathf.Clamp01(d / radius)), center);
             }
         }
     }

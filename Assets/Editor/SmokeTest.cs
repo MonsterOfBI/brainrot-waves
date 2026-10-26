@@ -99,6 +99,8 @@ namespace BrainrotWaves.EditorTools
                     {
                         var gen = new ArenaGenerator(GameManager.ArenaHalfSize);
                         gen.Build(theme, null, Camera.main);
+                        Particles.Ambient(theme, PlayerController.Instance.transform);
+                        if (PostFX.Instance != null) PostFX.Instance.ApplyTheme(theme);
                         int renderers = gen.Root.GetComponentsInChildren<Renderer>().Length;
                         var tri = UnityEngine.AI.NavMesh.CalculateTriangulation();
                         Note("Arena " + theme + ": renderers " + renderers + ", navmesh verts " + tri.vertices.Length);
@@ -128,16 +130,28 @@ namespace BrainrotWaves.EditorTools
                     step++;
                     var ui = GameUI.Instance;
                     bool picked = false;
-                    ui.ShowUpgrades(Upgrades.PickThree(), u => { u.apply(RunState.stats); picked = true; });
+                    ui.ShowUpgrades(Upgrades.PickThree(), u => { u.apply(RunState.stats); picked = true; }, () => { });
                     ui.CloseScreen();
                     foreach (var u in Upgrades.All) u.apply(new PlayerStats());
                     ui.ShowShop(() => new List<GameUI.ShopItem> { new GameUI.ShopItem { name = "x", description = "y", price = 1, color = Color.red, buy = () => true } }, () => { });
                     ui.CloseScreen();
                     ui.ShowPause(() => { }, () => { });
                     ui.CloseScreen();
-                    ui.ShowEnd(true, true, () => { }, () => { });
+                    ui.ShowEnd(true, Meta.ComputeReward(true), () => { }, () => { });
+                    ui.CloseScreen();
+                    ui.ShowEnd(false, null, () => { }, () => { });
                     ui.CloseScreen();
                     ui.ShowBanner("TEST", "test", 1f);
+                    foreach (IconKind k in System.Enum.GetValues(typeof(IconKind))) Icons.Get(k);
+                    var settings = SettingsScreen.Show(ui.GetComponentInChildren<Canvas>().GetComponent<RectTransform>(), null);
+                    var selectTab = typeof(SettingsScreen).GetMethod("SelectTab", BindingFlags.NonPublic | BindingFlags.Instance);
+                    var tabType = typeof(SettingsScreen).GetNestedType("Tab", BindingFlags.NonPublic);
+                    foreach (var tab in System.Enum.GetValues(tabType)) selectTab.Invoke(settings, new object[] { tab });
+                    Object.Destroy(settings.gameObject);
+                    Loc.Set(Loc.Current == Lang.RU ? Lang.EN : Lang.RU);
+                    Loc.Set(Loc.Current == Lang.RU ? Lang.EN : Lang.RU);
+                    ui.ShowBossIntro(Brainrots.All[0]);
+                    ui.HideBossIntro();
                     Note("UI screens ok (picked flag " + picked + ")");
                 }
                 else if (step == 5 && t > 22)
@@ -152,13 +166,30 @@ namespace BrainrotWaves.EditorTools
                     step++;
                     var menu = Object.FindFirstObjectByType<MainMenu>();
                     var select = typeof(MainMenu).GetMethod("SelectHero", BindingFlags.NonPublic | BindingFlags.Instance);
-                    for (int i = 0; i < Brainrots.All.Length; i++) select.Invoke(menu, new object[] { i });
-                    Note("Menu heroes ok");
+                    for (int i = 0; i < Brainrots.All.Length; i++) select.Invoke(menu, new object[] { i, true });
+                    var showLab = typeof(MainMenu).GetMethod("ShowLab", BindingFlags.NonPublic | BindingFlags.Instance);
+                    showLab.Invoke(menu, null);
+                    Note("Menu heroes + lab ok");
+                    select.Invoke(menu, new object[] { 0, true });
                     var play = typeof(MainMenu).GetMethod("Play", BindingFlags.NonPublic | BindingFlags.Instance);
                     play.Invoke(menu, null);
                     Note("Play pressed (hero " + RunState.hero + ", arenas " + RunState.ArenaCount + ")");
                 }
-                else if (step == 7 && t > 40)
+                else if (step == 7 && t > 36)
+                {
+                    step++;
+                    var gm = GameManager.Instance;
+                    Note("Game loaded via loader: " + (gm != null));
+                    if (gm != null)
+                    {
+                        PlayerController.Instance.Health.damageTakenMultiplier = 0f;
+                        var bossRoutine = typeof(GameManager).GetMethod("BossIntro", BindingFlags.NonPublic | BindingFlags.Instance);
+                        var b = Enemy.Create(BrainrotId.Patapim, PlayerController.Instance.transform.position + Vector3.forward * 12f, true, 500f, 1f);
+                        gm.StartCoroutine((System.Collections.IEnumerator)bossRoutine.Invoke(gm, new object[] { b, Brainrots.Get(BrainrotId.Patapim) }));
+                        Note("Boss intro started");
+                    }
+                }
+                else if (step == 8 && t > 44)
                 {
                     step++;
                     Note("After 14s of real wave: enemies " + Enemy.Active.Count + ", kills " + RunState.kills + ", status '" + (GameManager.Instance != null ? GameManager.Instance.StatusTitle : "-") + "'");

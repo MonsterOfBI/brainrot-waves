@@ -20,6 +20,8 @@ namespace BrainrotWaves
         /// <summary>Урон (сколько, критический ли).</summary>
         public event Action<float, bool> Damaged;
         public event Action<Health> Died;
+        /// <summary>Урон с известным источником (для индикатора направления).</summary>
+        public event Action<Vector3> DamagedFrom;
 
         float invulnerableUntil;
 
@@ -47,6 +49,22 @@ namespace BrainrotWaves
             Changed?.Invoke();
             if (IsDead) Died?.Invoke(this);
             return true;
+        }
+
+        /// <summary>Урон от источника в точке source (индикатор покажет направление).</summary>
+        public bool TakeDamageFrom(float amount, Vector3 source)
+        {
+            bool hit = TakeDamage(amount);
+            if (hit) DamagedFrom?.Invoke(source);
+            return hit;
+        }
+
+        /// <summary>Воскрешение (улучшение «Второй шанс»).</summary>
+        public void Revive(float fraction, float invulnerableSeconds)
+        {
+            Current = Mathf.Max(1f, maxHealth * fraction);
+            invulnerableUntil = Time.time + invulnerableSeconds;
+            Changed?.Invoke();
         }
 
         public void Heal(float amount)

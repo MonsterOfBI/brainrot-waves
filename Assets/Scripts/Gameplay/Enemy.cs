@@ -41,6 +41,7 @@ namespace BrainrotWaves
         Vector3 knockback;
         float spawnTimer = 0.45f;
         float hoverAngle;
+        Vector3 lastHitDirection;
 
         State state = State.Move;
         Special pendingSpecial;
@@ -119,7 +120,9 @@ namespace BrainrotWaves
                 if (agent.isOnNavMesh) agent.Warp(spawnPosition);
             }
 
-            FX.Burst(spawnPosition + Vector3.up * 0.5f, GameAssets.Hex("#7E57C2"), 8, 5f, 0.25f, 0.6f);
+            FX.Burst(spawnPosition + Vector3.up * 0.5f, GameAssets.Hex("#7E57C2"), 4, 5f, 0.25f, 0.6f);
+            Particles.Sparkle(spawnPosition + Vector3.up * 0.8f, GameAssets.Hex("#B388FF"), 12, 3f, 0.2f);
+            if (!flyer) Particles.Dust(spawnPosition, 0.8f * size, 8, GameAssets.Hex("#8D6E63"));
             return enemy;
         }
 
@@ -136,12 +139,22 @@ namespace BrainrotWaves
         public void TakeHit(float amount, bool crit, Vector3 point)
         {
             if (IsDead) return;
+            Vector3 from = PlayerController.Instance != null ? PlayerController.Instance.transform.position : point - transform.forward;
+            lastHitDirection = transform.position - from;
             if (Health.TakeDamage(amount, crit))
             {
-                rig.Hurt();
+                rig.Hurt(lastHitDirection);
                 FX.DamageNumber(point, amount, crit);
-                FX.Burst(point, Info.themeColor, crit ? 4 : 2, 4f, 0.08f, 0.35f);
+                Vector3 normal = (from + Vector3.up * 1.5f - point).normalized;
+                Particles.Sparks(point, normal, Info.themeColor, crit ? 10 : 5, crit ? 9f : 6f);
+                if (crit) Particles.Flash(point, new Color(1f, 0.9f, 0.3f), 1.2f, 0.1f);
             }
+        }
+
+        /// <summary>Рык босса для заставки.</summary>
+        public void Roar(float duration)
+        {
+            if (rig != null) rig.Roar(duration);
         }
 
         public void Knockback(Vector3 force)
@@ -171,10 +184,11 @@ namespace BrainrotWaves
         void Die()
         {
             Active.Remove(this);
-            FX.Burst(transform.position + Vector3.up * Size, Info.themeColor, IsBoss ? 40 : 12, IsBoss ? 14f : 7f, IsBoss ? 0.5f : 0.22f, IsBoss ? 1.6f : 0.9f);
-            FX.Burst(transform.position + Vector3.up * Size, Color.white, IsBoss ? 16 : 5, 6f, 0.15f, 0.7f);
+            if (rootVisual != null) Destroy(rootVisual);
+            Particles.Sparkle(transform.position + Vector3.up * Size, Color.white, IsBoss ? 20 : 6, 5f, 0.18f);
+            DeathAnimation.Play(this, modelRoot, rig, lastHitDirection);
             SoundFX.Play(SoundFX.Sfx.EnemyDie, IsBoss ? 1f : 0.55f, 0.15f);
-            if (IsBoss) CameraShake.Add(0.8f);
+            if (IsBoss) CameraShake.Add(0.5f);
 
             int coins = IsBoss ? 40 + RunState.arenaIndex * 10 : Info.coins;
             Vector3 dropPosition = transform.position + Vector3.up * (Info.behavior == EnemyBehavior.Flyer ? 0f : 1f);
@@ -293,10 +307,11 @@ namespace BrainrotWaves
                     stateTimer -= dt;
                     agent.Move(dashDirection * (IsBoss ? 26f : 20f) * dt);
                     rig.moveAmount = 1f;
+                    if (Time.frameCount % 2 == 0) Particles.Dust(transform.position, 0.4f * Size, 1, GameAssets.Hex("#BCAAA4"));
                     if (!dashHit && Vector3.Distance(transform.position, player.transform.position) < 1.6f + Size * 0.5f)
                     {
                         dashHit = true;
-                        player.Health.TakeDamage(damage * 1.3f);
+                        player.Health.TakeDamageFrom(damage * 1.3f, transform.position);
                         CameraShake.Add(0.3f);
                     }
                     if (stateTimer <= 0f) state = State.Move;
@@ -372,7 +387,7 @@ namespace BrainrotWaves
                     attackCooldown = IsBoss ? 1.2f : 1f;
                     if (Vector3.Distance(transform.position, player.transform.position) < attackRange + 0.6f)
                     {
-                        player.Health.TakeDamage(damage);
+                        player.Health.TakeDamageFrom(damage, transform.position);
                         if (Info.id == BrainrotId.Patapim) player.ApplySlow(0.55f, 1.5f);
                     }
                     break;
@@ -415,11 +430,12 @@ namespace BrainrotWaves
             state = State.Move;
             float radius = IsBoss ? 6f : 3.2f;
             FX.Ring(leapTo, radius, Info.themeColor, 0.4f);
-            FX.Burst(leapTo + Vector3.up * 0.2f, GameAssets.Hex("#8D6E63"), 8, 6f, 0.2f, 0.7f);
+            FX.Burst(leapTo + Vector3.up * 0.2f, GameAssets.Hex("#8D6E63"), 5, 6f, 0.2f, 0.7f);
+            Particles.Dust(leapTo, radius * 0.5f, 16, GameAssets.Hex("#A1887F"));
             CameraShake.AddAt(leapTo, IsBoss ? 0.7f : 0.35f, 20f);
             SoundFX.Play(SoundFX.Sfx.Explosion, IsBoss ? 0.8f : 0.4f, 0.2f);
             if (Vector3.Distance(leapTo, player.transform.position) < radius)
-                player.Health.TakeDamage(damage * 1.4f);
+                player.Health.TakeDamageFrom(damage * 1.4f, leapTo);
         }
 
         void ThrowAt(PlayerController player, Projectile.Kind kind, float dmg, float spreadDegrees = 0f)

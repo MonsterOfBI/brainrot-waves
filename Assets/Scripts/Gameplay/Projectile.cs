@@ -133,8 +133,9 @@ namespace BrainrotWaves
             else
             {
                 if (direct && !fromPlayer && PlayerController.Instance != null)
-                    PlayerController.Instance.Health.TakeDamage(damage);
-                FX.Burst(point, color, 6, 4f, 0.12f, 0.5f);
+                    PlayerController.Instance.Health.TakeDamageFrom(damage, transform.position - velocity.normalized * 2f);
+                FX.Burst(point, color, 3, 4f, 0.12f, 0.5f);
+                Particles.Sparkle(point, color, 8, 3f, 0.18f);
             }
             Destroy(gameObject);
         }

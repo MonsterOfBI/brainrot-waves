@@ -22,8 +22,17 @@ namespace BrainrotWaves
         int nextSource;
         readonly Dictionary<int, AudioClip> musicCache = new Dictionary<int, AudioClip>();
 
+        /// <summary>Громкость звуков (с учётом общей громкости). Задаётся из настроек.</summary>
         public static float MasterVolume = 0.8f;
+        /// <summary>Громкость музыки (с учётом общей громкости).</summary>
         public static float MusicVolume = 0.35f;
+
+        public static void ApplyVolumes()
+        {
+            MasterVolume = GameSettings.MasterVolume * GameSettings.SfxVolume;
+            MusicVolume = GameSettings.MasterVolume * GameSettings.MusicVolume * 0.6f;
+            if (instance != null && instance.music != null) instance.music.volume = MusicVolume;
+        }
 
         public static SoundFX I
         {
@@ -35,6 +44,8 @@ namespace BrainrotWaves
                     DontDestroyOnLoad(go);
                     instance = go.AddComponent<SoundFX>();
                     instance.Init();
+                    GameSettings.EnsureLoaded();
+                    ApplyVolumes();
                 }
                 return instance;
             }

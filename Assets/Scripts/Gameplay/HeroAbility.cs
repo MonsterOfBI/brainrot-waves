@@ -21,6 +21,8 @@ namespace BrainrotWaves
         public bool Ready => cooldownLeft <= 0f;
         public float SlowTimeLeft => slowTimeLeft;
 
+        public event System.Action Activated;
+
         public static bool SlowTimeActive => Enemy.TimeScale < 0.99f;
 
         void OnDisable()
@@ -44,9 +46,8 @@ namespace BrainrotWaves
 
             if (player.IsDashing && hero.id == BrainrotId.Tralalero) DashDamage(player.transform.position + Vector3.up);
 
-            var keyboard = Keyboard.current;
-            if (keyboard == null || !player.InputEnabled || !PlayerController.IsCursorLocked) return;
-            if (keyboard.qKey.wasPressedThisFrame || keyboard.eKey.wasPressedThisFrame)
+            if (!player.InputEnabled || !PlayerController.IsCursorLocked) return;
+            if (Controls.Down(GameAction.Ability))
             {
                 if (Ready) Activate(player);
                 else SoundFX.Play(SoundFX.Sfx.Empty, 0.4f);
@@ -59,6 +60,8 @@ namespace BrainrotWaves
         {
             cooldownLeft = Cooldown;
             SoundFX.Play(SoundFX.Sfx.Ability, 0.8f);
+            Particles.Sparkle(player.transform.position + Vector3.up, hero.themeColor, 20, 5f, 0.25f);
+            Activated?.Invoke();
             float dmg = RunState.stats.damageMultiplier;
             Vector3 forward = cam.transform.forward;
             Vector3 flatForward = new Vector3(forward.x, 0f, forward.z).normalized;
@@ -78,7 +81,8 @@ namespace BrainrotWaves
 
                 case BrainrotId.TungTung:
                     FX.Ring(feet, 8f, hero.themeColor, 0.5f);
-                    FX.Burst(feet + Vector3.up * 0.2f, GameAssets.Hex("#8D6E63"), 14, 9f, 0.25f, 0.9f);
+                    FX.Burst(feet + Vector3.up * 0.2f, GameAssets.Hex("#8D6E63"), 8, 9f, 0.25f, 0.9f);
+                    Particles.Dust(feet, 3f, 30, GameAssets.Hex("#A1887F"));
                     CameraShake.Add(0.6f);
                     SoundFX.Play(SoundFX.Sfx.Explosion, 0.8f);
                     Combat.DamageEnemiesInRadius(feet, 8f, 90f * dmg, 18f);
