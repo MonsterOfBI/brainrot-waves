@@ -17,3 +17,5 @@ MonoBehaviour:
   litTransparent: {fileID: 2100000, guid: e77aa7cd022cad5438df08bec905b535, type: 2}
   unlit: {fileID: 2100000, guid: 116393750b6b2f940b5b2e63ec4eba09, type: 2}
   skybox: {fileID: 2100000, guid: ab35c59da1e819a4ba5d28cdfa302f1d, type: 2}
+  particleAlpha: {fileID: 2100000, guid: d2ddd03d7f3285d43a8b0a8229b70183, type: 2}
+  particleAdditive: {fileID: 2100000, guid: b2ac4e22a58ae0c49b17e94849a11c59, type: 2}
