@@ -11,14 +11,16 @@ namespace BrainrotWaves.EditorTools
     {
         void OnPreprocessAudio()
         {
-            if (!assetPath.StartsWith("Assets/Resources/Audio") && !assetPath.StartsWith("Assets/Resources/Music")) return;
+            bool ambientClip = assetPath.StartsWith("Assets/Resources/Ambient");
+            if (!assetPath.StartsWith("Assets/Resources/Audio") && !assetPath.StartsWith("Assets/Resources/Music") && !ambientClip) return;
             var importer = (AudioImporter)assetImporter;
-            bool music = assetPath.StartsWith("Assets/Resources/Music");
-            importer.forceToMono = !music;
+            bool music = assetPath.StartsWith("Assets/Resources/Music") || ambientClip;
+            importer.forceToMono = !music || ambientClip;
             importer.loadInBackground = music;
             var settings = importer.defaultSampleSettings;
             settings.compressionFormat = AudioCompressionFormat.Vorbis;
-            settings.quality = music ? 0.45f : 0.6f;
+            settings.quality = ambientClip ? 0.25f : music ? 0.4f : 0.6f;
+            if (music) settings.sampleRateSetting = AudioSampleRateSetting.OptimizeSampleRate;
             settings.loadType = music ? AudioClipLoadType.Streaming : AudioClipLoadType.DecompressOnLoad;
             settings.preloadAudioData = !music;
             importer.defaultSampleSettings = settings;

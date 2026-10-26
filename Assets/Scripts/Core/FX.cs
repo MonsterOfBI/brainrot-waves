@@ -29,6 +29,23 @@ namespace BrainrotWaves
             }
         }
 
+        static readonly System.Collections.Generic.Dictionary<string, GameObject> cfxCache = new System.Collections.Generic.Dictionary<string, GameObject>();
+
+        /// <summary>Готовый мультяшный эффект из Cartoon FX Remaster Free (Resources/CFX). Возвращает false, если пака нет.</summary>
+        public static bool Cfx(string name, Vector3 position, float scale = 1f, Quaternion? rotation = null)
+        {
+            if (!cfxCache.TryGetValue(name, out var prefab))
+            {
+                prefab = Resources.Load<GameObject>("CFX/" + name);
+                cfxCache[name] = prefab;
+            }
+            if (prefab == null) return false;
+            var go = Object.Instantiate(prefab, position, rotation ?? Quaternion.identity);
+            go.transform.localScale = Vector3.one * scale;
+            Object.Destroy(go, 5f);
+            return true;
+        }
+
         /// <summary>Разлёт цветных кусочков (смерть врага, попадание).</summary>
         public static void Burst(Vector3 position, Color color, int count, float speed, float size, float life = 0.8f)
         {
@@ -76,6 +93,8 @@ namespace BrainrotWaves
             Burst(position, new Color(0.25f, 0.22f, 0.2f), 5, radius * 3f, 0.35f, 1f);
             Burst(position, color, 4, radius * 4f, 0.22f, 0.6f);
             Particles.Fireball(position, radius, color);
+            Cfx("CFXR Explosion 1", position, Mathf.Clamp(radius / 2.5f, 0.6f, 2.5f));
+            if (radius >= 3f && Random.value < 0.35f) Cfx("CFXR _BOOM_", position + Vector3.up * 1.5f, 1.2f);
             Particles.Dust(new Vector3(position.x, 0.05f, position.z), radius * 0.6f, 10, new Color(0.55f, 0.5f, 0.45f));
             CameraShake.AddAt(position, 0.5f, radius * 6f);
             SoundFX.Play(SoundFX.Sfx.Explosion, 0.9f, 0.15f);

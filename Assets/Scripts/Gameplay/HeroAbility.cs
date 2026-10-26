@@ -83,6 +83,8 @@ namespace BrainrotWaves
                     FX.Ring(feet, 8f, hero.themeColor, 0.5f);
                     FX.Burst(feet + Vector3.up * 0.2f, GameAssets.Hex("#8D6E63"), 8, 9f, 0.25f, 0.9f);
                     Particles.Dust(feet, 3f, 30, GameAssets.Hex("#A1887F"));
+                    FX.Cfx("CFXR2 Ground Hit", feet, 2.5f);
+                    FX.Cfx("CFXR _POW_", feet + Vector3.up * 2f, 1.3f);
                     CameraShake.Add(0.6f);
                     SoundFX.Play(SoundFX.Sfx.Explosion, 0.8f);
                     Combat.DamageEnemiesInRadius(feet, 8f, 90f * dmg, 18f);

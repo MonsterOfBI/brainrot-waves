@@ -156,6 +156,8 @@ namespace BrainrotWaves
                 Particles.Sparkle(center, color, 40, 9f, 0.4f);
                 CameraShake.Add(0.9f);
                 PostFX.Impact(1f);
+                FX.Cfx("CFXR2 WW Enemy Explosion", center, 3f);
+                FX.Cfx("CFXR _POW_", center + Vector3.up * 2f, 2f);
             }
             else if (style == Style.Crash)
             {
@@ -166,6 +168,7 @@ namespace BrainrotWaves
                 FX.Burst(center, color, 6, 6f, 0.2f, 0.8f);
                 Particles.Sparkle(center, color, 12, 4f, 0.2f);
                 Particles.Smoke(center, 0.6f * size, 4, new Color(0.9f, 0.9f, 0.9f, 0.5f));
+                FX.Cfx("CFXR Magic Poof", center, 0.8f * size);
             }
             Destroy(gameObject);
         }

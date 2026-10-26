@@ -147,7 +147,11 @@ namespace BrainrotWaves
                 FX.DamageNumber(point, amount, crit);
                 Vector3 normal = (from + Vector3.up * 1.5f - point).normalized;
                 Particles.Sparks(point, normal, Info.themeColor, crit ? 10 : 5, crit ? 9f : 6f);
-                if (crit) Particles.Flash(point, new Color(1f, 0.9f, 0.3f), 1.2f, 0.1f);
+                if (crit)
+                {
+                    Particles.Flash(point, new Color(1f, 0.9f, 0.3f), 1.2f, 0.1f);
+                    FX.Cfx("CFXR3 Hit Light B (Air)", point, 0.6f);
+                }
             }
         }
 
@@ -432,6 +436,7 @@ namespace BrainrotWaves
             FX.Ring(leapTo, radius, Info.themeColor, 0.4f);
             FX.Burst(leapTo + Vector3.up * 0.2f, GameAssets.Hex("#8D6E63"), 5, 6f, 0.2f, 0.7f);
             Particles.Dust(leapTo, radius * 0.5f, 16, GameAssets.Hex("#A1887F"));
+            FX.Cfx("CFXR2 Ground Hit", leapTo, IsBoss ? 2f : 1f);
             CameraShake.AddAt(leapTo, IsBoss ? 0.7f : 0.35f, 20f);
             SoundFX.Play(SoundFX.Sfx.Explosion, IsBoss ? 0.8f : 0.4f, 0.2f);
             if (Vector3.Distance(leapTo, player.transform.position) < radius)
