@@ -17,3 +17,6 @@
 .idea/
 *.apk
 *.aab
+
+/Assets/_Recovery/
+/Assets/_Recovery.meta
