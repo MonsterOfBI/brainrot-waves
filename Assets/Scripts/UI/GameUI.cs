@@ -31,6 +31,53 @@ namespace BrainrotWaves
         bool abilityWasReady = true;
         Color bannerColor = Color.white;
 
+        // Навыки
+        class SkillSlot
+        {
+            public Image icon, fill, frame;
+            public Text key, name;
+            public float flash;
+            public bool wasReady = true;
+        }
+        readonly SkillSlot[] skillSlots = new SkillSlot[2];
+        RectTransform objectiveBar;
+        Image objectiveFill;
+        Text objectiveText;
+        Text powerText;
+        float powerTimer;
+        Color powerColor;
+
+        SkillSlot BuildSkillSlot(int index)
+        {
+            var def = index == 0 ? RunState.HeroInfo.q : RunState.HeroInfo.e;
+            var slot = new SkillSlot();
+            var panel = UIKit.Image(hud, "Skill" + index, UIKit.Panel);
+            UIKit.Place(panel.rectTransform, Vector2.zero, new Vector2(515f + index * 102f, 30f), new Vector2(90f, 90f));
+            slot.frame = panel;
+            slot.icon = UIKit.Icon(panel.rectTransform, "Icon", def.Icon, RunState.HeroInfo.themeColor, new Vector2(0.5f, 0.5f), new Vector2(0f, 4f), 56f, new Vector2(0.5f, 0.5f));
+            slot.fill = UIKit.Image(panel.rectTransform, "Cooldown", new Color(0f, 0f, 0f, 0.72f));
+            slot.fill.rectTransform.anchorMin = Vector2.zero;
+            slot.fill.rectTransform.anchorMax = Vector2.one;
+            slot.fill.rectTransform.offsetMin = new Vector2(5f, 5f);
+            slot.fill.rectTransform.offsetMax = new Vector2(-5f, -5f);
+            var keyBack = UIKit.Image(panel.rectTransform, "KeyBack", new Color(0f, 0f, 0f, 0.6f));
+            UIKit.Place(keyBack.rectTransform, new Vector2(1f, 0f), new Vector2(-4f, 4f), new Vector2(30f, 26f), new Vector2(1f, 0f));
+            slot.key = UIKit.Text(keyBack.rectTransform, "Key", "", 17, TextAnchor.MiddleCenter, Color.white, true, false);
+            UIKit.Stretch(slot.key.rectTransform);
+            slot.name = UIKit.Text(hud, "SkillName" + index, def.name, 15, TextAnchor.LowerCenter, new Color(1f, 1f, 1f, 0.75f));
+            UIKit.Place(slot.name.rectTransform, Vector2.zero, new Vector2(515f + index * 102f - 10f, 124f), new Vector2(110f, 40f));
+            return slot;
+        }
+
+        /// <summary>Подобран бонус с поля: крупная надпись на секунду.</summary>
+        public void ShowPowerUp(string label, Color color)
+        {
+            powerText.text = label;
+            powerColor = color;
+            powerTimer = 1.4f;
+            powerText.gameObject.SetActive(true);
+        }
+
         // Индикатор направления урона
         class DamageArrow
         {
@@ -144,19 +191,25 @@ namespace BrainrotWaves
             healthText = UIKit.Text(healthBack.rectTransform, "Text", "", 24, TextAnchor.MiddleCenter, Color.white, true);
             UIKit.Stretch(healthText.rectTransform);
 
-            // Способность
-            var abilityPanel = UIKit.Image(hud, "AbilityPanel", UIKit.Panel);
-            UIKit.Place(abilityPanel.rectTransform, Vector2.zero, new Vector2(515f, 30f), new Vector2(90f, 90f));
-            abilityIcon = UIKit.Icon(abilityPanel.rectTransform, "Icon", AbilityIcon(RunState.hero), RunState.HeroInfo.themeColor, new Vector2(0.5f, 0.5f), Vector2.zero, 62f, new Vector2(0.5f, 0.5f));
-            abilityFill = UIKit.Image(abilityPanel.rectTransform, "Cooldown", new Color(0f, 0f, 0f, 0.7f));
-            abilityFill.rectTransform.anchorMin = new Vector2(0f, 0f);
-            abilityFill.rectTransform.anchorMax = new Vector2(1f, 1f);
-            abilityFill.rectTransform.offsetMin = new Vector2(6f, 6f);
-            abilityFill.rectTransform.offsetMax = new Vector2(-6f, -6f);
-            abilityKey = UIKit.Text(abilityPanel.rectTransform, "Key", "", 24, TextAnchor.LowerRight, Color.white, true);
-            UIKit.Place(abilityKey.rectTransform, new Vector2(1f, 0f), new Vector2(-6f, 2f), new Vector2(80f, 30f), new Vector2(1f, 0f));
-            abilityText = UIKit.Text(hud, "AbilityName", RunState.HeroInfo.abilityName, 20, TextAnchor.LowerLeft, Color.white);
-            UIKit.Place(abilityText.rectTransform, Vector2.zero, new Vector2(515f, 126f), new Vector2(320f, 28f));
+            // Навыки Q и E
+            for (int i = 0; i < 2; i++) skillSlots[i] = BuildSkillSlot(i);
+
+            // Прочность пиццерии (режим защиты)
+            objectiveBar = UIKit.Rect(hud, "ObjectiveBar");
+            UIKit.Place(objectiveBar, new Vector2(0.5f, 1f), new Vector2(0f, -104f), new Vector2(620f, 40f), new Vector2(0.5f, 1f));
+            UIKit.Icon(objectiveBar, "Icon", IconKind.Home, UIKit.Accent, new Vector2(0f, 0.5f), new Vector2(0f, 0f), 36f, new Vector2(0f, 0.5f));
+            var objBack = UIKit.Image(objectiveBar, "Back", new Color(0f, 0f, 0f, 0.55f));
+            UIKit.Place(objBack.rectTransform, new Vector2(0f, 0.5f), new Vector2(44f, 0f), new Vector2(576f, 22f), new Vector2(0f, 0.5f));
+            objectiveFill = UIKit.Image(objBack.rectTransform, "Fill", UIKit.Accent);
+            UIKit.Stretch(objectiveFill.rectTransform, 3f);
+            objectiveText = UIKit.Text(objBack.rectTransform, "Text", "", 16, TextAnchor.MiddleCenter, Color.white, true);
+            UIKit.Stretch(objectiveText.rectTransform);
+            objectiveBar.gameObject.SetActive(false);
+
+            // Всплывающее сообщение о бонусе с поля
+            powerText = UIKit.Text(hud, "Power", "", 40, TextAnchor.MiddleCenter, Color.white, true);
+            UIKit.Place(powerText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -150f), new Vector2(900f, 70f), new Vector2(0.5f, 0.5f));
+            powerText.gameObject.SetActive(false);
 
             // Оружие (справа снизу)
             var weaponPanel = UIKit.Image(hud, "WeaponPanel", UIKit.Panel);
@@ -319,17 +372,22 @@ namespace BrainrotWaves
             var ability = gm.Ability;
             if (ability != null)
             {
-                float cd = ability.CooldownFraction;
-                abilityFill.rectTransform.anchorMax = new Vector2(1f, Mathf.Max(cd, 0f));
-                abilityFill.enabled = cd > 0.01f;
-                abilityKey.text = Controls.KeyName(GameAction.Ability);
-                abilityKey.color = cd <= 0f ? Color.white : new Color(1f, 1f, 1f, 0.5f);
-                bool ready = cd <= 0f;
-                if (ready && !abilityWasReady) abilityReadyFlash = 0.4f;
-                abilityWasReady = ready;
-                abilityReadyFlash = Mathf.MoveTowards(abilityReadyFlash, 0f, dt);
-                abilityIcon.color = ready ? RunState.HeroInfo.themeColor * (0.85f + 0.15f * Mathf.Sin(Time.unscaledTime * 5f)) + Color.white * abilityReadyFlash * 2f : RunState.HeroInfo.themeColor * 0.5f;
-                abilityIcon.rectTransform.localScale = Vector3.one * (1f + abilityReadyFlash * 0.8f);
+                for (int i = 0; i < 2; i++)
+                {
+                    var sl = skillSlots[i];
+                    float f = ability.Fraction(i);
+                    sl.fill.rectTransform.anchorMax = new Vector2(1f, f);
+                    sl.fill.enabled = f > 0.01f;
+                    sl.key.text = Controls.KeyName(i == 0 ? GameAction.Ability : GameAction.Ability2);
+                    bool rd = f <= 0.001f;
+                    if (rd && !sl.wasReady) { sl.flash = 0.4f; SoundFX.Play(SoundFX.Sfx.Coin, 0.25f); }
+                    sl.wasReady = rd;
+                    sl.flash = Mathf.MoveTowards(sl.flash, 0f, dt);
+                    Color theme = RunState.HeroInfo.themeColor;
+                    sl.icon.color = rd ? Color.Lerp(theme, Color.white, sl.flash * 2f) : theme * 0.45f;
+                    sl.icon.rectTransform.localScale = Vector3.one * (1f + sl.flash * 0.7f);
+                    sl.frame.color = rd ? Color.Lerp(UIKit.Panel, theme * 0.6f, 0.35f + 0.15f * Mathf.Sin(Time.unscaledTime * 4f + i)) : UIKit.Panel;
+                }
             }
 
             // Оружие
@@ -409,14 +467,36 @@ namespace BrainrotWaves
                 if (bannerTimer <= 0f) banner.gameObject.SetActive(false);
             }
 
-            hintText.gameObject.SetActive(RunState.arenaIndex == 0 && gm.WaveNumber <= 1);
+            hintText.gameObject.SetActive(false); // управление показывается только в паузе (Esc)
+
+            // Пиццерия
+            var objective = DefenseObjective.Instance;
+            objectiveBar.gameObject.SetActive(objective != null && !objective.Destroyed && letterbox < 0.5f);
+            if (objective != null && !objective.Destroyed)
+            {
+                objectiveFill.rectTransform.anchorMax = new Vector2(Mathf.Max(0.001f, objective.Fraction), 1f);
+                objectiveFill.color = Color.Lerp(GameAssets.Hex("#FF4D5E"), UIKit.Accent, Mathf.InverseLerp(0.2f, 0.6f, objective.Fraction));
+                objectiveText.text = Loc.T("ПИЦЦЕРИЯ НОННЫ  ", "NONNA'S PIZZERIA  ") + Mathf.CeilToInt(objective.Fraction * 100f) + "%";
+            }
+            if (bossBar.gameObject.activeSelf && objectiveBar.gameObject.activeSelf) bossBar.anchoredPosition = new Vector2(0f, -150f);
+            else bossBar.anchoredPosition = new Vector2(0f, -110f);
+
+            // Бонус с поля
+            if (powerTimer > 0f)
+            {
+                powerTimer -= dt;
+                float k = Mathf.Clamp01(powerTimer / 0.4f);
+                powerText.color = new Color(powerColor.r, powerColor.g, powerColor.b, k);
+                powerText.rectTransform.localScale = Vector3.one * (1f + Mathf.Clamp01(powerTimer - 1.1f) * 2f);
+                if (powerTimer <= 0f) powerText.gameObject.SetActive(false);
+            }
 
             // Заставка босса: чёрные полосы сверху и снизу
             letterbox = Mathf.MoveTowards(letterbox, letterboxTarget, dt * 2.5f);
             float lb = Ease.InOutCubic(letterbox);
             letterboxTop.anchoredPosition = new Vector2(0f, 140f * (1f - lb));
             letterboxBottom.anchoredPosition = new Vector2(0f, -140f * (1f - lb));
-            hudGroup.alpha = 1f - lb;
+            hudGroup.alpha = ScreenOpen ? 0f : 1f - lb;
             letterboxTop.gameObject.SetActive(letterbox > 0.001f);
             letterboxBottom.gameObject.SetActive(letterbox > 0.001f);
         }
@@ -628,44 +708,157 @@ namespace BrainrotWaves
             next.gameObject.AddComponent<Pulse>().amount = 0.03f;
         }
 
+        /// <summary>Плашка показателя: иконка, подпись, значение.</summary>
+        static void StatChip(RectTransform parent, Vector2 pos, float width, IconKind icon, Color color, string label, string value)
+        {
+            var chip = UIKit.Image(parent, "Chip", UIKit.PanelLight);
+            UIKit.Place(chip.rectTransform, new Vector2(0f, 1f), pos, new Vector2(width, 58f), new Vector2(0f, 1f));
+            UIKit.Icon(chip.rectTransform, "Icon", icon, color, new Vector2(0f, 0.5f), new Vector2(12f, 0f), 34f, new Vector2(0f, 0.5f));
+            var l = UIKit.Text(chip.rectTransform, "Label", label, 18, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0.65f), false, false);
+            UIKit.Place(l.rectTransform, new Vector2(0f, 0.5f), new Vector2(56f, 0f), new Vector2(width - 160f, 50f), new Vector2(0f, 0.5f));
+            var v = UIKit.Text(chip.rectTransform, "Value", value, 24, TextAnchor.MiddleRight, Color.white, true, false);
+            UIKit.Place(v.rectTransform, new Vector2(1f, 0.5f), new Vector2(-14f, 0f), new Vector2(150f, 50f), new Vector2(1f, 0.5f));
+        }
+
+        /// <summary>Карточка навыка: иконка, клавиша, название, описание, перезарядка.</summary>
+        public static void SkillCard(RectTransform parent, Vector2 pos, float width, AbilityDef def, string key, Color color)
+        {
+            var card = UIKit.Image(parent, "SkillCard", UIKit.PanelLight);
+            UIKit.Place(card.rectTransform, new Vector2(0f, 1f), pos, new Vector2(width, 96f), new Vector2(0f, 1f));
+            var iconBack = UIKit.Image(card.rectTransform, "IconBack", new Color(color.r * 0.35f, color.g * 0.35f, color.b * 0.35f, 1f));
+            UIKit.Place(iconBack.rectTransform, new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(72f, 72f), new Vector2(0f, 0.5f));
+            UIKit.Icon(iconBack.rectTransform, "Icon", def.Icon, color, new Vector2(0.5f, 0.5f), Vector2.zero, 48f, new Vector2(0.5f, 0.5f));
+            var keyBack = UIKit.Image(iconBack.rectTransform, "Key", new Color(0f, 0f, 0f, 0.75f));
+            UIKit.Place(keyBack.rectTransform, new Vector2(1f, 0f), new Vector2(6f, -6f), new Vector2(30f, 26f), new Vector2(1f, 0f));
+            var k = UIKit.Text(keyBack.rectTransform, "K", key, 16, TextAnchor.MiddleCenter, Color.white, true, false);
+            UIKit.Stretch(k.rectTransform);
+            var n = UIKit.Text(card.rectTransform, "Name", def.name, 22, TextAnchor.UpperLeft, color, true, false);
+            UIKit.Place(n.rectTransform, new Vector2(0f, 1f), new Vector2(98f, -10f), new Vector2(width - 200f, 30f), new Vector2(0f, 1f));
+            var cd = UIKit.Text(card.rectTransform, "Cd", Mathf.RoundToInt(def.cooldown * RunState.stats.abilityCooldownMultiplier) + Loc.T(" с", " s"), 18, TextAnchor.UpperRight, new Color(1f, 1f, 1f, 0.55f), true, false);
+            UIKit.Place(cd.rectTransform, new Vector2(1f, 1f), new Vector2(-12f, -12f), new Vector2(90f, 26f), new Vector2(1f, 1f));
+            var d = UIKit.Text(card.rectTransform, "Desc", def.description, 18, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.8f), false, false);
+            UIKit.Place(d.rectTransform, new Vector2(0f, 1f), new Vector2(98f, -42f), new Vector2(width - 110f, 52f), new Vector2(0f, 1f));
+        }
+
+        static string ModeName(GameMode mode)
+        {
+            switch (mode)
+            {
+                case GameMode.Survival: return Loc.T("Выживание", "Survival");
+                case GameMode.Defense: return Loc.T("Защита пиццерии", "Pizzeria defense");
+                default: return Loc.T("Сюжет", "Story");
+            }
+        }
+
         public void ShowPause(Action onResume, Action onMenu)
         {
-            var screen = NewScreen(new Color(0.03f, 0.02f, 0.08f, 0.8f));
-            UIKit.Icon(screen, "PauseIcon", IconKind.Pause, Color.white, new Vector2(0.5f, 0.5f), new Vector2(0f, 360f), 80f, new Vector2(0.5f, 0.5f));
-            Title(screen, Loc.T("ПАУЗА", "PAUSED"), 260f, Color.white, 90);
-
+            var screen = NewScreen(new Color(0.02f, 0.02f, 0.05f, 0.84f));
+            var hero = RunState.HeroInfo;
+            var player = PlayerController.Instance;
             var stats = RunState.stats;
-            string info = Loc.T("Герой: ", "Hero: ") + RunState.HeroInfo.name + (RunState.threat > 0 ? Loc.T(" · Угроза ", " · Threat ") + RunState.threat : "") + "\n" +
-                          Loc.T("Урон ×", "Damage ×") + stats.damageMultiplier.ToString("0.00") + Loc.T(" · Скорострельность ×", " · Fire rate ×") + stats.fireRateMultiplier.ToString("0.00") + "\n" +
-                          Loc.T("Крит ", "Crit ") + Mathf.RoundToInt(stats.critChance * 100f) + Loc.T("% · Скорость ×", "% · Speed ×") + stats.moveSpeedMultiplier.ToString("0.00") + "\n" +
-                          Loc.T("Побеждено врагов: ", "Enemies defeated: ") + RunState.kills + Loc.T(" · Лучшее комбо: ", " · Best combo: ") + RunState.bestCombo;
-            var infoText = UIKit.Text(screen, "Info", info, 28, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.85f));
-            UIKit.Place(infoText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 120f), new Vector2(1300f, 160f), new Vector2(0.5f, 0.5f));
 
-            var resume = UIKit.IconButton(screen, "Resume", IconKind.Play, new LS("Продолжить", "Resume"), UIKit.OkColor, onResume, 36);
-            UIKit.Place(resume.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), new Vector2(480f, 86f), new Vector2(0.5f, 0.5f));
-            SlideIn.Add(resume, new Vector2(0f, -40f), 0.05f, 0.3f);
+            // ----- Слева: кнопки -----
+            UIKit.Icon(screen, "PauseIcon", IconKind.Pause, hero.themeColor, new Vector2(0f, 1f), new Vector2(80f, -70f), 56f, new Vector2(0f, 1f));
+            var title = UIKit.Text(screen, "Title", Loc.T("ПАУЗА", "PAUSED"), 70, TextAnchor.MiddleLeft, Color.white, true);
+            UIKit.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(150f, -60f), new Vector2(500f, 80f), new Vector2(0f, 1f));
+            var mode = UIKit.Text(screen, "Mode", ModeName(RunState.mode) + (RunState.threat > 0 ? Loc.T(" · угроза ", " · threat ") + RunState.threat : ""), 24, TextAnchor.MiddleLeft, hero.themeColor, true);
+            UIKit.Place(mode.rectTransform, new Vector2(0f, 1f), new Vector2(84f, -150f), new Vector2(500f, 34f), new Vector2(0f, 1f));
 
-            var settings = UIKit.IconButton(screen, "Settings", IconKind.Gear, new LS("Настройки", "Settings"), new Color(0.25f, 0.4f, 0.75f, 1f), () => SettingsScreen.Show(overlay, null), 32);
-            UIKit.Place(settings.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0f, -130f), new Vector2(480f, 80f), new Vector2(0.5f, 0.5f));
-            SlideIn.Add(settings, new Vector2(0f, -40f), 0.1f, 0.3f);
+            var resume = UIKit.IconButton(screen, "Resume", IconKind.Play, new LS("Продолжить", "Resume"), UIKit.OkColor, onResume, 30);
+            UIKit.Place(resume.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(80f, -230f), new Vector2(460f, 80f), new Vector2(0f, 1f));
+            SlideIn.Add(resume, new Vector2(-60f, 0f), 0.05f, 0.3f);
+            var settings = UIKit.IconButton(screen, "Settings", IconKind.Gear, new LS("Настройки", "Settings"), new Color(0.2f, 0.35f, 0.7f, 1f), () => SettingsScreen.Show(overlay, null), 30);
+            UIKit.Place(settings.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(80f, -326f), new Vector2(460f, 80f), new Vector2(0f, 1f));
+            SlideIn.Add(settings, new Vector2(-60f, 0f), 0.1f, 0.3f);
+            var menu = UIKit.IconButton(screen, "Menu", IconKind.Exit, new LS("Выйти в меню", "Main menu"), UIKit.Purple, onMenu, 30);
+            UIKit.Place(menu.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(80f, -422f), new Vector2(460f, 80f), new Vector2(0f, 1f));
+            SlideIn.Add(menu, new Vector2(-60f, 0f), 0.15f, 0.3f);
+            var warn = UIKit.Text(screen, "Warn", new LS("Кристаллы за забег всё равно начислятся", "You still get crystals for this run"), 18, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.45f));
+            UIKit.Place(warn.rectTransform, new Vector2(0f, 1f), new Vector2(84f, -512f), new Vector2(460f, 50f), new Vector2(0f, 1f));
 
-            var menu = UIKit.IconButton(screen, "Menu", IconKind.Exit, new LS("Выйти в меню", "Main menu"), UIKit.Purple, onMenu, 32);
-            UIKit.Place(menu.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0f, -225f), new Vector2(480f, 80f), new Vector2(0.5f, 0.5f));
-            SlideIn.Add(menu, new Vector2(0f, -40f), 0.15f, 0.3f);
-            var warn = UIKit.Text(screen, "Warn", new LS("Кристаллы за забег всё равно начислятся", "You still get crystals for this run"), 22, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.5f));
-            UIKit.Place(warn.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -290f), new Vector2(900f, 34f), new Vector2(0.5f, 0.5f));
+            // Управление (только здесь, в бою подсказок нет)
+            var ctrl = UIKit.Image(screen, "Controls", UIKit.Panel);
+            UIKit.Place(ctrl.rectTransform, new Vector2(0f, 0f), new Vector2(80f, 60f), new Vector2(460f, 400f), new Vector2(0f, 0f));
+            var ch = UIKit.Text(ctrl.rectTransform, "Head", new LS("УПРАВЛЕНИЕ", "CONTROLS"), 22, TextAnchor.UpperLeft, UIKit.Accent, true);
+            UIKit.Place(ch.rectTransform, new Vector2(0f, 1f), new Vector2(20f, -14f), new Vector2(420f, 30f), new Vector2(0f, 1f));
+            string[,] rows =
+            {
+                { Controls.KeyName(GameAction.Forward) + Controls.KeyName(GameAction.Left) + Controls.KeyName(GameAction.Back) + Controls.KeyName(GameAction.Right), Loc.T("ходить", "move") },
+                { Controls.KeyName(GameAction.Sprint), Loc.T("бег", "sprint") },
+                { Controls.KeyName(GameAction.Jump), Loc.T("прыжок", "jump") },
+                { Loc.T("ЛКМ", "LMB"), Loc.T("стрелять", "shoot") },
+                { Controls.KeyName(GameAction.Reload), Loc.T("перезарядка", "reload") },
+                { "1 / 2 / 3", Loc.T("оружие (или колесо)", "weapons (or wheel)") },
+                { Controls.KeyName(GameAction.Ability), hero.q.name },
+                { Controls.KeyName(GameAction.Ability2), hero.e.name },
+                { "Esc", Loc.T("пауза", "pause") },
+            };
+            for (int i = 0; i < rows.GetLength(0); i++)
+            {
+                var kb = UIKit.Image(ctrl.rectTransform, "Key", new Color(1f, 1f, 1f, 0.1f));
+                UIKit.Place(kb.rectTransform, new Vector2(0f, 1f), new Vector2(20f, -52f - i * 37f), new Vector2(130f, 31f), new Vector2(0f, 1f));
+                var kt = UIKit.Text(kb.rectTransform, "T", rows[i, 0], 17, TextAnchor.MiddleCenter, Color.white, true, false);
+                UIKit.Stretch(kt.rectTransform);
+                var at = UIKit.Text(ctrl.rectTransform, "A", rows[i, 1], 18, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0.8f), false, false);
+                UIKit.Place(at.rectTransform, new Vector2(0f, 1f), new Vector2(165f, -52f - i * 37f), new Vector2(280f, 31f), new Vector2(0f, 1f));
+            }
+
+            // ----- Справа: показатели героя -----
+            var panel = UIKit.Image(screen, "Stats", UIKit.Panel);
+            UIKit.Place(panel.rectTransform, new Vector2(1f, 0.5f), new Vector2(-70f, 0f), new Vector2(1160f, 810f), new Vector2(1f, 0.5f));
+            SlideIn.Add(panel, new Vector2(120f, 0f), 0.05f, 0.35f);
+            var pr = panel.rectTransform;
+            var bar = UIKit.Image(pr, "Bar", hero.themeColor);
+            UIKit.Place(bar.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(1130f, 8f), new Vector2(0.5f, 1f));
+            var name = UIKit.Text(pr, "Hero", hero.name, 46, TextAnchor.MiddleLeft, hero.themeColor, true);
+            UIKit.Place(name.rectTransform, new Vector2(0f, 1f), new Vector2(30f, -34f), new Vector2(1100f, 60f), new Vector2(0f, 1f));
+            var passive = UIKit.Text(pr, "Passive", "<color=#FFC93C>" + hero.passiveName + ":</color> " + hero.passiveDescription, 20, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0.85f), false, false);
+            UIKit.Place(passive.rectTransform, new Vector2(0f, 1f), new Vector2(32f, -96f), new Vector2(1100f, 30f), new Vector2(0f, 1f));
+
+            var sh = UIKit.Text(pr, "StatsHead", new LS("ПОКАЗАТЕЛИ", "STATS"), 20, TextAnchor.UpperLeft, UIKit.Accent, true);
+            UIKit.Place(sh.rectTransform, new Vector2(0f, 1f), new Vector2(30f, -142f), new Vector2(400f, 28f), new Vector2(0f, 1f));
+            float hpNow = player != null ? player.Health.Current : 0f, hpMax = player != null ? player.Health.maxHealth : 0f;
+            float colW = 540f;
+            Vector2 P(int i) => new Vector2(30f + (i % 2) * (colW + 20f), -178f - (i / 2) * 66f);
+            StatChip(pr, P(0), colW, IconKind.Heart, GameAssets.Hex("#FF5F7E"), Loc.T("Здоровье", "Health"), Mathf.CeilToInt(hpNow) + " / " + Mathf.CeilToInt(hpMax));
+            StatChip(pr, P(1), colW, IconKind.Sword, GameAssets.Hex("#FF8A3D"), Loc.T("Урон", "Damage"), "×" + stats.damageMultiplier.ToString("0.00"));
+            StatChip(pr, P(2), colW, IconKind.Bullet, UIKit.Accent, Loc.T("Скорострельность", "Fire rate"), "×" + stats.fireRateMultiplier.ToString("0.00"));
+            StatChip(pr, P(3), colW, IconKind.Crosshair, GameAssets.Hex("#FFE066"), Loc.T("Шанс крита", "Crit chance"), Mathf.RoundToInt(stats.critChance * 100f) + "%");
+            StatChip(pr, P(4), colW, IconKind.Boot, UIKit.Cyan, Loc.T("Скорость", "Speed"), "×" + stats.moveSpeedMultiplier.ToString("0.00"));
+            StatChip(pr, P(5), colW, IconKind.Shield, GameAssets.Hex("#7FA7FF"), Loc.T("Броня", "Armor"), "−" + Mathf.RoundToInt((1f - stats.damageTakenMultiplier) * 100f) + "%");
+            StatChip(pr, P(6), colW, IconKind.Plus, UIKit.Green, Loc.T("Лечение", "Regen"), stats.regenPerSecond.ToString("0.#") + Loc.T(" /с", " /s"));
+            StatChip(pr, P(7), colW, IconKind.Coin, UIKit.Accent, Loc.T("Монеты", "Coins"), RunState.coins.ToString());
+
+            var skh = UIKit.Text(pr, "SkillsHead", new LS("НАВЫКИ", "SKILLS"), 20, TextAnchor.UpperLeft, UIKit.Accent, true);
+            UIKit.Place(skh.rectTransform, new Vector2(0f, 1f), new Vector2(30f, -452f), new Vector2(400f, 28f), new Vector2(0f, 1f));
+            SkillCard(pr, new Vector2(30f, -488f), colW, hero.q, Controls.KeyName(GameAction.Ability), hero.themeColor);
+            SkillCard(pr, new Vector2(30f + colW + 20f, -488f), colW, hero.e, Controls.KeyName(GameAction.Ability2), hero.themeColor);
+
+            var rh = UIKit.Text(pr, "RunHead", new LS("ЗАБЕГ", "RUN"), 20, TextAnchor.UpperLeft, UIKit.Accent, true);
+            UIKit.Place(rh.rectTransform, new Vector2(0f, 1f), new Vector2(30f, -606f), new Vector2(400f, 28f), new Vector2(0f, 1f));
+            int minutes = Mathf.FloorToInt(RunState.time / 60f), seconds = Mathf.FloorToInt(RunState.time % 60f);
+            float w3 = (1100f - 40f) / 3f;
+            Vector2 R(int i) => new Vector2(30f + (i % 3) * (w3 + 20f), -642f - (i / 3) * 66f);
+            StatChip(pr, R(0), w3, IconKind.Skull, UIKit.Pink, Loc.T("Враги", "Kills"), RunState.kills.ToString());
+            StatChip(pr, R(1), w3, IconKind.Fire, UIKit.Pink, Loc.T("Комбо", "Combo"), RunState.bestCombo.ToString());
+            StatChip(pr, R(2), w3, IconKind.Clock, UIKit.Cyan, Loc.T("Время", "Time"), minutes + ":" + seconds.ToString("00"));
+            StatChip(pr, R(3), w3, IconKind.Wave, UIKit.Cyan, Loc.T("Волн", "Waves"), RunState.wavesCleared.ToString());
+            StatChip(pr, R(4), w3, IconKind.Trophy, UIKit.Accent, Loc.T("Боссы", "Bosses"), RunState.bossesKilled.ToString());
+            StatChip(pr, R(5), w3, IconKind.Reroll, UIKit.Accent, Loc.T("Перебросы", "Rerolls"), RunState.rerollsLeft.ToString());
         }
 
         public void ShowEnd(bool victory, Meta.RunReward reward, Action onRetry, Action onMenu)
         {
             var screen = NewScreen(victory ? new Color(0.05f, 0.08f, 0.04f, 0.88f) : new Color(0.12f, 0.02f, 0.05f, 0.9f));
             UIKit.Icon(screen, "Icon", victory ? IconKind.Trophy : IconKind.Skull, victory ? UIKit.Accent : UIKit.Pink, new Vector2(0.5f, 0.5f), new Vector2(0f, 420f), 100f, new Vector2(0.5f, 0.5f)).gameObject.AddComponent<Pulse>();
-            Title(screen, victory ? Loc.T("ПОБЕДА! БРЕЙНРОТЫ ПОВЕРЖЕНЫ!", "VICTORY! THE BRAINROTS ARE DEFEATED!") : Loc.T("ТЕБЯ ЗАБРЕЙНРОТИЛИ!", "YOU GOT BRAINROTTED!"), 320f, victory ? UIKit.Accent : UIKit.Pink, 68);
+            Title(screen, victory ? (RunState.mode == GameMode.Defense ? Loc.T("ПИЦЦЕРИЯ СПАСЕНА!", "PIZZERIA SAVED!") : Loc.T("ПОБЕДА! БРЕЙНРОТЫ ПОВЕРЖЕНЫ!", "VICTORY! THE BRAINROTS ARE DEFEATED!")) : Loc.T("ТЕБЯ ЗАБРЕЙНРОТИЛИ!", "YOU GOT BRAINROTTED!"), 320f, victory ? UIKit.Accent : UIKit.Pink, 64);
 
             int minutes = Mathf.FloorToInt(RunState.time / 60f);
             int seconds = Mathf.FloorToInt(RunState.time % 60f);
-            string arenaLine = victory
+            string arenaLine;
+            if (RunState.mode == GameMode.Survival) arenaLine = Loc.T("Выживание: продержался волн — ", "Survival: waves survived — ") + RunState.wavesCleared;
+            else if (RunState.mode == GameMode.Defense) arenaLine = Loc.T("Защита: волн — ", "Defense: waves — ") + RunState.wavesCleared + " / " + RunState.DefenseWaves;
+            else arenaLine = victory
                 ? Loc.T("Пройдены все арены: ", "All arenas cleared: ") + RunState.ArenaCount
                 : Loc.T("Арена: ", "Arena: ") + (RunState.arenaIndex + 1) + Loc.T(" из ", " of ") + RunState.ArenaCount + " (" + Brainrots.Get(RunState.CurrentArenaOwner).arenaName + ")";
             string text = Loc.T("Герой: ", "Hero: ") + RunState.HeroInfo.name + "\n" + arenaLine + "\n" +
@@ -699,6 +892,14 @@ namespace BrainrotWaves
                 var have = UIKit.Text(pr, "Have", Loc.T("Всего кристаллов: ", "Total crystals: ") + Meta.P.crystals, 22, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.7f));
                 UIKit.Place(have.rectTransform, new Vector2(1f, 0f), new Vector2(-200f, 20f), new Vector2(340f, 30f), new Vector2(0.5f, 0f));
 
+                if (reward.unlockedHeroes.Count > 0)
+                {
+                    string names = "";
+                    foreach (var h in reward.unlockedHeroes) names += (names.Length > 0 ? ", " : "") + h.name;
+                    var un = UIKit.Text(screen, "Unlocked", Loc.T("Новые герои открыты: ", "New heroes unlocked: ") + names, 28, TextAnchor.MiddleCenter, UIKit.Green, true);
+                    UIKit.Place(un.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -250f), new Vector2(1600f, 44f), new Vector2(0.5f, 0.5f));
+                    un.gameObject.AddComponent<Pulse>();
+                }
                 if (reward.threatUnlocked)
                 {
                     var unlock = UIKit.Text(screen, "Threat", Loc.T("Открыт новый уровень угрозы: ", "New threat level unlocked: ") + Meta.P.threatUnlocked + "!", 30, TextAnchor.MiddleCenter, UIKit.Pink, true);

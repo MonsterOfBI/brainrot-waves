@@ -12,15 +12,17 @@ namespace BrainrotWaves
         static Sprite rounded;
         static Sprite circle;
 
-        public static readonly Color Panel = new Color(0.08f, 0.06f, 0.14f, 0.88f);
+        public static readonly Color Panel = new Color(0.06f, 0.07f, 0.12f, 0.9f);
+        public static readonly Color PanelLight = new Color(0.12f, 0.13f, 0.2f, 0.95f);
+        public static readonly Color Border = new Color(1f, 1f, 1f, 0.09f);
         public static readonly Color Accent = GameAssets.Hex("#FFC93C");
         public static readonly Color Pink = GameAssets.Hex("#FF5FA2");
         public static readonly Color Cyan = GameAssets.Hex("#3DE0FF");
         public static readonly Color Green = GameAssets.Hex("#5CFF8A");
-        public static readonly Color Purple = GameAssets.Hex("#8E44AD");
+        public static readonly Color Purple = GameAssets.Hex("#5E35B1");
         public static readonly Color Crystal = GameAssets.Hex("#64FFDA");
-        public static readonly Color PlayColor = GameAssets.Hex("#E53977");
-        public static readonly Color OkColor = GameAssets.Hex("#2BB673");
+        public static readonly Color PlayColor = GameAssets.Hex("#E8335F");
+        public static readonly Color OkColor = GameAssets.Hex("#1FA866");
         public static readonly Color Dim = new Color(0.03f, 0.02f, 0.08f, 0.82f);
 
         /// <summary>Скруглённый прямоугольник, нарисованный кодом (растягивается без искажений).</summary>
@@ -28,7 +30,7 @@ namespace BrainrotWaves
         {
             get
             {
-                if (rounded == null) rounded = MakeRounded(64, 18);
+                if (rounded == null) rounded = MakeRounded(64, 10);
                 return rounded;
             }
         }
@@ -106,6 +108,13 @@ namespace BrainrotWaves
                 image.type = UnityEngine.UI.Image.Type.Sliced;
             }
             image.raycastTarget = false;
+            // Тонкая светлая рамка у панелей — выглядит аккуратнее и «дороже»
+            if (rounded && (color == Panel || color == PanelLight))
+            {
+                var border = rect.gameObject.AddComponent<Outline>();
+                border.effectColor = Border;
+                border.effectDistance = new Vector2(1.5f, -1.5f);
+            }
             return image;
         }
 
@@ -114,10 +123,10 @@ namespace BrainrotWaves
             var rect = Rect(parent, name);
             var text = rect.gameObject.AddComponent<Text>();
             bool title = bold && size >= 44;
-            text.font = title ? FX.TitleFont : FX.Font;
+            text.font = title ? FX.TitleFont : bold ? FX.BoldFont : FX.Font;
             text.text = value;
-            text.fontSize = size;
-            text.fontStyle = bold && !title ? FontStyle.Bold : FontStyle.Normal;
+            text.fontSize = title ? Mathf.RoundToInt(size * 0.82f) : size; // Unbounded широкий
+            text.fontStyle = FontStyle.Normal;
             text.alignment = anchor;
             text.color = color ?? Color.white;
             text.raycastTarget = false;
@@ -126,9 +135,9 @@ namespace BrainrotWaves
             text.supportRichText = true;
             if (outline)
             {
-                var o = rect.gameObject.AddComponent<Outline>();
-                o.effectColor = new Color(0f, 0f, 0f, 0.75f);
-                o.effectDistance = new Vector2(2f, -2f);
+                var o = rect.gameObject.AddComponent<Shadow>();
+                o.effectColor = new Color(0f, 0f, 0f, 0.65f);
+                o.effectDistance = new Vector2(0f, -Mathf.Max(1.5f, size * 0.06f));
             }
             return text;
         }
@@ -235,6 +244,17 @@ namespace BrainrotWaves
                 SoundFX.Play(SoundFX.Sfx.Click, 0.6f);
                 onClick?.Invoke();
             });
+            // Блик сверху и тёмная кромка снизу — кнопка выглядит объёмной
+            var shine = Image(image.rectTransform, "Shine", new Color(1f, 1f, 1f, 0.1f));
+            shine.rectTransform.anchorMin = new Vector2(0f, 0.5f);
+            shine.rectTransform.anchorMax = new Vector2(1f, 1f);
+            shine.rectTransform.offsetMin = new Vector2(2f, 0f);
+            shine.rectTransform.offsetMax = new Vector2(-2f, -2f);
+            var edge = Image(image.rectTransform, "Edge", new Color(0f, 0f, 0f, 0.28f), false);
+            edge.rectTransform.anchorMin = new Vector2(0f, 0f);
+            edge.rectTransform.anchorMax = new Vector2(1f, 0f);
+            edge.rectTransform.offsetMin = new Vector2(6f, 0f);
+            edge.rectTransform.offsetMax = new Vector2(-6f, 4f);
             var text = Text(image.rectTransform, "Label", label, fontSize, TextAnchor.MiddleCenter, Color.white, true);
             Stretch(text.rectTransform, 10f);
             image.gameObject.AddComponent<ButtonHover>();
@@ -276,7 +296,7 @@ namespace BrainrotWaves
         void Update()
         {
             if (GetComponent<PopIn>() != null) return;
-            float target = hover ? 1.06f : 1f;
+            float target = hover ? 1.035f : 1f;
             float s = Mathf.MoveTowards(transform.localScale.x, target, Time.unscaledDeltaTime * 1.5f);
             transform.localScale = Vector3.one * s;
         }

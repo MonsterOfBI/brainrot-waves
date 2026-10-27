@@ -8,7 +8,8 @@ namespace BrainrotWaves
     {
         Heart, Sword, Bullet, Shield, Boot, Crosshair, Plus, Coin, Magnet, Chest, Bolt, Reroll, Star, Crystal,
         Ammo, Reload, Fang, Bomb, Fire, Skull, Gear, Speaker, Globe, Lock, Trophy, Clock, Flask, Brain, Back,
-        Keyboard, Monitor, Play, Note, Exit, Pause, Wave, Check
+        Keyboard, Monitor, Play, Note, Exit, Pause, Wave, Check,
+        Leaf, Spiral, Snow, Tower, Cloud, Home, Infinity, Book, Users
     }
 
     /// <summary>
@@ -271,6 +272,39 @@ namespace BrainrotWaves
                     return p => U(Seg(p, -0.8f, 0.4f, 0.8f, 0.4f, 0.12f), Seg(p, -0.8f, 0f, 0.8f, 0f, 0.12f), Seg(p, -0.8f, -0.4f, 0.8f, -0.4f, 0.12f));
                 case IconKind.Check:
                     return p => U(Seg(p, -0.6f, 0f, -0.15f, -0.5f, 0.13f), Seg(p, -0.15f, -0.5f, 0.7f, 0.55f, 0.13f));
+                case IconKind.Leaf:
+                    return p =>
+                    {
+                        var q = Rot(p, -35f);
+                        var e = new Vector2(q.x / 0.45f, q.y / 0.85f);
+                        return Sub(U((e.magnitude - 1f) * 0.45f, Seg(q, 0f, -0.85f, 0f, -1f, 0.06f)), Seg(q, 0f, -0.75f, 0f, 0.7f, 0.035f));
+                    };
+                case IconKind.Spiral:
+                    return p => U(Arc(p, 0.72f, 0.09f, 20f, 300f), Arc(p, 0.45f, 0.09f, 200f, 120f), Circle(p, 0f, 0f, 0.14f));
+                case IconKind.Snow:
+                    return p =>
+                    {
+                        float d = 9f;
+                        for (int i = 0; i < 3; i++)
+                        {
+                            var q = Rot(p, i * 60f);
+                            d = U(d, Seg(q, 0f, -0.85f, 0f, 0.85f, 0.07f), Seg(q, 0f, 0.5f, 0.22f, 0.72f, 0.05f), Seg(q, 0f, 0.5f, -0.22f, 0.72f, 0.05f),
+                                Seg(q, 0f, -0.5f, 0.22f, -0.72f, 0.05f), Seg(q, 0f, -0.5f, -0.22f, -0.72f, 0.05f));
+                        }
+                        return d;
+                    };
+                case IconKind.Tower:
+                    return p => U(Box(p, 0f, -0.55f, 0.6f, 0.2f, 0.05f), Box(p, 0f, -0.05f, 0.35f, 0.35f, 0.08f), Circle(p, 0f, 0.35f, 0.32f), Seg(p, 0f, 0.35f, 0.75f, 0.6f, 0.1f));
+                case IconKind.Cloud:
+                    return p => U(Circle(p, -0.35f, -0.1f, 0.35f), Circle(p, 0.05f, 0.12f, 0.45f), Circle(p, 0.42f, -0.12f, 0.33f), Box(p, 0f, -0.25f, 0.65f, 0.2f, 0.15f));
+                case IconKind.Home:
+                    return p => U(Sub(Box(p, 0f, -0.3f, 0.6f, 0.45f, 0.05f), Box(p, 0f, -0.48f, 0.16f, 0.28f, 0.04f)), Poly(p, -0.85f, 0.1f, 0f, 0.85f, 0.85f, 0.1f));
+                case IconKind.Infinity:
+                    return p => U(Ring(p, -0.4f, 0f, 0.3f, 0.1f), Ring(p, 0.4f, 0f, 0.3f, 0.1f));
+                case IconKind.Book:
+                    return p => U(Sub(Box(p, -0.38f, 0f, 0.36f, 0.62f, 0.05f), Box(p, -0.38f, 0.1f, 0.22f, 0.04f)), Sub(Box(p, 0.38f, 0f, 0.36f, 0.62f, 0.05f), Box(p, 0.38f, 0.1f, 0.22f, 0.04f)));
+                case IconKind.Users:
+                    return p => U(Circle(p, -0.3f, 0.3f, 0.25f), Circle(p, 0.35f, 0.35f, 0.22f), Box(p, -0.3f, -0.4f, 0.4f, 0.28f, 0.2f), Box(p, 0.4f, -0.35f, 0.32f, 0.24f, 0.18f));
                 default:
                     return p => Circle(p, 0f, 0f, 0.7f);
             }

@@ -24,7 +24,13 @@ namespace BrainrotWaves
         public int bestCombo;
         public int threatUnlocked;     // максимальный открытый уровень угрозы
         public int selectedThreat;
-        public int lastHero;
+        public int lastHero;            // BrainrotId последнего выбранного героя
+        public int lastMode;            // GameMode
+        // Достижения (для открытия героев)
+        public int bossesTotal;
+        public int bestSurvivalWave;
+        public int bestDefenseWave;
+        public int defenseWins;
 
         public int LabRank(string key)
         {
@@ -43,7 +49,7 @@ namespace BrainrotWaves
             }
         }
 
-        public bool HeroUnlocked(BrainrotId id) => unlockedHeroes.Contains((int)id) || Meta.HeroPrice(id) <= 0;
+        public bool HeroUnlocked(BrainrotId id) => unlockedHeroes.Contains((int)id) || Meta.HeroPrice(id) <= 0 || Meta.GoalMet(Brainrots.Get(id));
     }
 
     /// <summary>Одно постоянное улучшение в Лаборатории.</summary>
@@ -140,22 +146,55 @@ namespace BrainrotWaves
 
         // ---------- Герои ----------
 
-        /// <summary>Цена открытия героя в кристаллах (0 — открыт сразу).</summary>
-        public static int HeroPrice(BrainrotId id)
+        /// <summary>
+        /// Цена открытия героя в кристаллах (0 — открыт сразу).
+        /// Героя можно открыть двумя путями (как в Vampire Survivors и Hades): выполнить задание бесплатно или купить.
+        /// </summary>
+        public static int HeroPrice(BrainrotId id) => Brainrots.Get(id).price;
+
+        /// <summary>Сколько уже сделано для задания открытия.</summary>
+        public static int GoalProgress(UnlockGoal goal)
         {
-            switch (id)
+            var p = P;
+            switch (goal)
             {
-                case BrainrotId.Chimpanzini: return 60;
-                case BrainrotId.Cappuccino: return 120;
-                case BrainrotId.Bombardiro: return 200;
-                case BrainrotId.TungTung: return 300;
+                case UnlockGoal.StoryArenas: return p.bestArena;
+                case UnlockGoal.StoryWins: return p.wins;
+                case UnlockGoal.BossesTotal: return p.bossesTotal;
+                case UnlockGoal.SurvivalWave: return p.bestSurvivalWave;
+                case UnlockGoal.DefenseWave: return p.bestDefenseWave;
+                case UnlockGoal.KillsTotal: return p.totalKills;
                 default: return 0;
             }
         }
 
+        public static bool GoalMet(BrainrotInfo info) => info.goal != UnlockGoal.None && GoalProgress(info.goal) >= info.goalValue;
+
+        /// <summary>Текст задания: «Пройди 2 арены в сюжете (1/2)».</summary>
+        public static string GoalText(BrainrotInfo info)
+        {
+            if (info.goal == UnlockGoal.None) return "";
+            int v = info.goalValue;
+            string what;
+            switch (info.goal)
+            {
+                case UnlockGoal.StoryArenas: what = Loc.T("Пройди арен в сюжете: " + v, "Clear story arenas: " + v); break;
+                case UnlockGoal.StoryWins: what = Loc.T("Пройди сюжет до конца", "Beat the story"); break;
+                case UnlockGoal.BossesTotal: what = Loc.T("Победи боссов: " + v, "Defeat bosses: " + v); break;
+                case UnlockGoal.SurvivalWave: what = Loc.T("Доживи до волны " + v + " в выживании", "Reach wave " + v + " in survival"); break;
+                case UnlockGoal.DefenseWave: what = Loc.T("Продержись " + v + " волн в защите", "Hold " + v + " waves in defense"); break;
+                default: what = Loc.T("Победи врагов: " + v, "Defeat enemies: " + v); break;
+            }
+            return what + " (" + Mathf.Min(GoalProgress(info.goal), v) + "/" + v + ")";
+        }
+
         public static bool TryUnlockHero(BrainrotId id)
         {
-            if (P.HeroUnlocked(id)) return true;
+            if (P.HeroUnlocked(id))
+            {
+                if (!P.unlockedHeroes.Contains((int)id)) { P.unlockedHeroes.Add((int)id); Save(); }
+                return true;
+            }
             int price = HeroPrice(id);
             if (P.crystals < price) return false;
             P.crystals -= price;
@@ -226,6 +265,7 @@ namespace BrainrotWaves
             public int total;
             public bool newRecord;
             public bool threatUnlocked;
+            public readonly List<BrainrotInfo> unlockedHeroes = new List<BrainrotInfo>();
         }
 
         public static RunReward ComputeReward(bool victory)
@@ -238,13 +278,15 @@ namespace BrainrotWaves
                 coins = RunState.coinsCollected,
                 combo = RunState.bestCombo
             };
-            r.fromWaves = r.waves * 2;
-            r.fromBosses = r.bosses * 20;
-            r.fromKills = r.kills / 4;
-            r.fromCoins = r.coins / 10;
-            r.fromCombo = Mathf.Min(r.combo / 5, 20);
-            r.fromVictory = victory ? 60 : 0;
-            r.multiplier = ThreatReward(RunState.threat) * RunState.stats.crystalMultiplier;
+            // Экономика 2.0: героев открывают за десятки забегов, а не за один
+            bool story = RunState.mode == GameMode.Story;
+            r.fromWaves = r.waves * (story ? 1 : 2);
+            r.fromBosses = r.bosses * (story ? 15 : 10);
+            r.fromKills = r.kills / 6;
+            r.fromCoins = r.coins / 15;
+            r.fromCombo = Mathf.Min(r.combo / 10, 10);
+            r.fromVictory = victory ? (story ? 40 : 50) : 0;
+            r.multiplier = (story ? ThreatReward(RunState.threat) : 1f) * RunState.stats.crystalMultiplier;
             int sum = r.fromWaves + r.fromBosses + r.fromKills + r.fromCoins + r.fromCombo + r.fromVictory;
             r.total = Mathf.Max(1, Mathf.RoundToInt(sum * r.multiplier));
             return r;
@@ -260,15 +302,36 @@ namespace BrainrotWaves
             p.runs++;
             p.totalKills += RunState.kills;
             if (RunState.bestCombo > p.bestCombo) p.bestCombo = RunState.bestCombo;
-            int reached = victory ? RunState.ArenaCount : RunState.arenaIndex;
-            if (reached > p.bestArena)
+            var locked = new List<BrainrotInfo>();
+            foreach (var h in Brainrots.All) if (!p.HeroUnlocked(h.id)) locked.Add(h);
+            p.bossesTotal += RunState.bossesKilled;
+
+            if (RunState.mode == GameMode.Survival)
             {
-                p.bestArena = reached;
-                reward.newRecord = true;
+                if (RunState.wavesCleared > p.bestSurvivalWave) { p.bestSurvivalWave = RunState.wavesCleared; reward.newRecord = true; }
             }
-            if (victory)
+            else if (RunState.mode == GameMode.Defense)
             {
-                p.wins++;
+                if (RunState.wavesCleared > p.bestDefenseWave) { p.bestDefenseWave = RunState.wavesCleared; reward.newRecord = true; }
+                if (victory) p.defenseWins++;
+            }
+            else
+            {
+                int reached = victory ? RunState.ArenaCount : RunState.arenaIndex;
+                if (reached > p.bestArena)
+                {
+                    p.bestArena = reached;
+                    reward.newRecord = true;
+                }
+                if (victory) p.wins++;
+            }
+
+            // Кто открылся за этот забег по заданиям
+            foreach (var h in locked)
+                if (p.HeroUnlocked(h.id)) { reward.unlockedHeroes.Add(h); p.unlockedHeroes.Add((int)h.id); }
+
+            if (victory && RunState.mode == GameMode.Story)
+            {
                 if (RunState.threat >= p.threatUnlocked && p.threatUnlocked < MaxThreat)
                 {
                     p.threatUnlocked = RunState.threat + 1;
@@ -302,6 +365,12 @@ namespace BrainrotWaves
             if (profile.labRanks == null) profile.labRanks = new List<int>();
             if (profile.unlockedHeroes == null) profile.unlockedHeroes = new List<int>();
             while (profile.labRanks.Count < profile.labKeys.Count) profile.labRanks.Add(0);
+            if (profile.version < 2)
+            {
+                // Переход на экономику 2.0: уже открытые герои остаются открытыми
+                profile.version = 2;
+                profile.bossesTotal = Mathf.Max(profile.bossesTotal, profile.wins * 5);
+            }
             // Победы из старой версии игры открывают первый уровень угрозы
             if (profile.wins > 0 && profile.threatUnlocked == 0) profile.threatUnlocked = 1;
         }

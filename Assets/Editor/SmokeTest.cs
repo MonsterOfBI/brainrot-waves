@@ -116,7 +116,8 @@ namespace BrainrotWaves.EditorTools
                     {
                         gm.Ability.hero = info;
                         activate.Invoke(gm.Ability, new object[] { PlayerController.Instance });
-                        Note("Ability " + info.abilityName + " ok");
+                        gm.Ability.ActivateSlot(PlayerController.Instance, 1);
+                        Note("Skills " + info.q.name + " / " + info.e.name + " ok");
                     }
                     Enemy.TimeScale = 1f;
                     gm.Weapons.Give(WeaponId.Rifle);

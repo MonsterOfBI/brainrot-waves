@@ -297,7 +297,7 @@ namespace BrainrotWaves
             var def = slot.def;
             var stats = RunState.stats;
             slot.ammo--;
-            nextFireTime = Time.time + 1f / (def.fireRate * stats.fireRateMultiplier);
+            nextFireTime = Time.time + 1f / (def.fireRate * stats.fireRateMultiplier * HeroAbility.FireRateBoost);
             recoil = Mathf.Min(recoil + def.recoil, 2.5f);
             CameraShake.Add(def.shake);
 
@@ -331,7 +331,7 @@ namespace BrainrotWaves
                     if (enemy != null && !enemy.IsDead)
                     {
                         bool crit = UnityEngine.Random.value < stats.critChance;
-                        float damage = def.damage * stats.damageMultiplier * (crit ? 2f : 1f);
+                        float damage = def.damage * stats.damageMultiplier * HeroAbility.DamageBoost * (crit ? 2f : 1f);
                         enemy.TakeHit(damage, crit, hit.point);
                         if (!enemy.IsDead) enemy.Knockback(dir * (def.id == WeaponId.Shotgun ? 1.2f : 0.5f));
                         anyHit = true;

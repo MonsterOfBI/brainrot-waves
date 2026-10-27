@@ -218,9 +218,10 @@ namespace BrainrotWaves
                     fog = GameAssets.Hex("#C89BC9"); fogDensity = 0.01f; skyTint = GameAssets.Hex("#C77DFF"); exposure = 1.0f; atmosphere = 2f;
                     break;
                 default:
-                    sunColor = GameAssets.Hex("#9DB4FF"); sunIntensity = 0.6f; sunEuler = new Vector3(35f, 150f, 0f);
-                    sky = GameAssets.Hex("#3A4C85"); equator = GameAssets.Hex("#2A3860"); groundAmbient = GameAssets.Hex("#1A2236");
-                    fog = GameAssets.Hex("#1A2340"); fogDensity = 0.022f; skyTint = GameAssets.Hex("#1A2350"); exposure = 0.25f; atmosphere = 0.6f;
+                    // Ночь, но персонажей хорошо видно: яркая луна, светлее окружение, туман реже
+                    sunColor = GameAssets.Hex("#B8C8FF"); sunIntensity = 1.05f; sunEuler = new Vector3(42f, 150f, 0f);
+                    sky = GameAssets.Hex("#6878B8"); equator = GameAssets.Hex("#4A5A90"); groundAmbient = GameAssets.Hex("#2E3A5C");
+                    fog = GameAssets.Hex("#2A3560"); fogDensity = 0.011f; skyTint = GameAssets.Hex("#1A2350"); exposure = 0.25f; atmosphere = 0.6f;
                     break;
             }
 

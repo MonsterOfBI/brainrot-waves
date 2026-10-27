@@ -6,7 +6,7 @@ namespace BrainrotWaves
     /// Собирает игрушечные модели брейнротов из простых фигур.
     /// Модель смотрит вперёд (+Z), стоит ногами на y = 0, высота около 2 метров.
     /// </summary>
-    public static class BrainrotModels
+    public static partial class BrainrotModels
     {
         // ---------- Инструменты ----------
 
@@ -75,7 +75,8 @@ namespace BrainrotWaves
                 case BrainrotId.Chimpanzini: rig = BuildChimpanzini(parent); break;
                 case BrainrotId.Bombardiro: rig = BuildBombardiro(parent); break;
                 case BrainrotId.Cappuccino: rig = BuildCappuccino(parent); break;
-                default: rig = BuildTungTung(parent); break;
+                case BrainrotId.TungTung: rig = BuildTungTung(parent); break;
+                default: rig = BuildNew(id, parent); break;
             }
             rig.Init();
             return rig;

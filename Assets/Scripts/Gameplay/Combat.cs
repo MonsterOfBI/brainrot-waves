@@ -49,6 +49,9 @@ namespace BrainrotWaves
             }
             else
             {
+                var objective = DefenseObjective.Instance;
+                if (objective != null && !objective.Destroyed && Vector3.Distance(center, objective.Center) < radius + objective.Radius)
+                    objective.Damage(damage * 0.8f);
                 var player = PlayerController.Instance;
                 if (player == null) return;
                 float d = Vector3.Distance(center, player.transform.position + Vector3.up * 0.9f);

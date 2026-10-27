@@ -11,6 +11,8 @@ namespace BrainrotWaves
         public float damageTakenMultiplier = 1f;
         [Tooltip("Неуязвимость после удара, сек")]
         public float invulnerabilityTime;
+        /// <summary>Временный множитель урона (щит навыка, фаза босса).</summary>
+        [System.NonSerialized] public float tempMultiplier = 1f;
 
         public float Current { get; private set; }
         public bool IsDead => Current <= 0f;
@@ -42,7 +44,7 @@ namespace BrainrotWaves
         {
             if (IsDead || amount <= 0f) return false;
             if (Time.time < invulnerableUntil) return false;
-            amount *= damageTakenMultiplier;
+            amount *= damageTakenMultiplier * tempMultiplier;
             Current = Mathf.Max(0f, Current - amount);
             if (invulnerabilityTime > 0f) invulnerableUntil = Time.time + invulnerabilityTime;
             Damaged?.Invoke(amount, crit);

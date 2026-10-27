@@ -127,7 +127,7 @@ namespace BrainrotWaves
                     lift = new Vector4(1f, 0.95f, 1f, 0f);
                     break;
                 case ArenaTheme.NightVillage:
-                    filter = new Color(0.85f, 0.9f, 1.1f); exposure = 0.35f; contrast = 18f; baseSaturation = 6f; bloomIntensity = 1.5f;
+                    filter = new Color(0.9f, 0.95f, 1.08f); exposure = 0.6f; contrast = 14f; baseSaturation = 10f; bloomIntensity = 1.3f;
                     baseVignette = 0.32f;
                     lift = new Vector4(0.9f, 0.95f, 1.1f, 0f);
                     break;

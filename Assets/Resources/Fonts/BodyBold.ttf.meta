@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 6c1a7236a14d8444ea53487f65660a78
+guid: 6e4af9bf842d24c468195da4875a9b73
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
@@ -9,7 +9,7 @@ TrueTypeFontImporter:
   characterPadding: 1
   includeFontData: 1
   fontNames:
-  - Russo One
+  - Exo 2
   fallbackFontReferences: []
   customCharacters: 
   fontRenderingMode: 0

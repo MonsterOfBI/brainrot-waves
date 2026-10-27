@@ -30,6 +30,14 @@ namespace BrainrotWaves
 
     public enum WeaponId { Pistol, Rifle, Shotgun }
 
+    /// <summary>Режим игры.</summary>
+    public enum GameMode
+    {
+        Story,     // сюжет: 5 арен с боссами по очереди, без Лаборатории
+        Survival,  // бесконечное выживание со всеми брейнротами
+        Defense    // защита пиццерии Нонны от волн брейнротов
+    }
+
     public class WeaponDef
     {
         public WeaponId id;
@@ -173,6 +181,11 @@ namespace BrainrotWaves
         public static int rerollsLeft;
         public static int revivesLeft;
         public static PlayerStats stats = new PlayerStats();
+        public static GameMode mode = GameMode.Story;
+        /// <summary>Арена текущего забега в выживании и защите.</summary>
+        public static ArenaTheme modeArena;
+        /// <summary>Сколько волн в защите нужно продержаться для победы.</summary>
+        public const int DefenseWaves = 15;
         public static readonly List<WeaponId> ownedWeapons = new List<WeaponId>();
         public static bool started;
         static float coinRemainder;
@@ -183,13 +196,28 @@ namespace BrainrotWaves
         public static BrainrotId CurrentArenaOwner => arenaOrder[Mathf.Clamp(arenaIndex, 0, arenaOrder.Count - 1)];
         public static int ArenaCount => arenaOrder.Count;
 
-        public static void StartNew(BrainrotId chosenHero, int threatLevel = -1)
+        public static void StartNew(BrainrotId chosenHero, int threatLevel = -1) => StartNew(chosenHero, mode, threatLevel);
+
+        public static void StartNew(BrainrotId chosenHero, GameMode gameMode, int threatLevel = -1)
         {
             hero = chosenHero;
-            threat = threatLevel >= 0 ? threatLevel : Mathf.Clamp(Meta.P.selectedThreat, 0, Meta.P.threatUnlocked);
+            mode = gameMode;
+            // Сюжетным режимом играют только сюжетные герои
+            if (mode == GameMode.Story && !HeroInfo.story) hero = BrainrotId.Tralalero;
+            threat = mode != GameMode.Story ? 0 : threatLevel >= 0 ? threatLevel : Mathf.Clamp(Meta.P.selectedThreat, 0, Meta.P.threatUnlocked);
             arenaOrder.Clear();
-            foreach (var info in Brainrots.All)
-                if (info.id != chosenHero) arenaOrder.Add(info.id);
+            if (mode == GameMode.Story)
+            {
+                foreach (var info in Brainrots.Story)
+                    if (info.id != hero) arenaOrder.Add(info.id);
+            }
+            else
+            {
+                // В выживании и защите арена одна, выбирается случайно
+                modeArena = (ArenaTheme)Random.Range(0, 6);
+                foreach (var info in Brainrots.Story)
+                    if (info.arena == modeArena) arenaOrder.Add(info.id);
+            }
 
             arenaIndex = 0;
             kills = 0;
@@ -205,11 +233,10 @@ namespace BrainrotWaves
 
             var info2 = HeroInfo;
             stats.moveSpeedMultiplier = info2.heroSpeedMultiplier;
-            if (chosenHero == BrainrotId.Patapim) stats.regenPerSecond = 2f;
-            if (chosenHero == BrainrotId.Cappuccino) stats.critChance += 0.2f;
-            if (chosenHero == BrainrotId.Bombardiro) stats.explosionDamageMultiplier += 0.2f;
+            info2.passive?.Invoke(stats);
 
-            Meta.ApplyLab(stats);
+            // Лаборатория работает только в выживании и защите
+            if (mode != GameMode.Story) Meta.ApplyLab(stats);
             coins = stats.startCoins;
             rerollsLeft = stats.rerolls;
             revivesLeft = stats.revives;

@@ -16,6 +16,7 @@ namespace BrainrotWaves
         Color color;
         float life = 8f;
         Vector3 spin;
+        bool hitObjective;
 
         public static Projectile Spawn(Vector3 position, Vector3 velocity, float gravity, float damage, float areaRadius,
             bool fromPlayer, Kind kind, Color? orbColor = null)
@@ -106,6 +107,19 @@ namespace BrainrotWaves
                         return;
                     }
                 }
+                // Защищаемый объект (режим защиты)
+                var objective = DefenseObjective.Instance;
+                if (objective != null && !objective.Destroyed)
+                {
+                    Vector3 c = objective.Center;
+                    Vector3 closest = ClosestPointOnSegment(previous, next, c);
+                    if (Vector3.Distance(closest, c) < objective.Radius)
+                    {
+                        hitObjective = true;
+                        Impact(closest, true);
+                        return;
+                    }
+                }
             }
 
             if (next.y <= 0.02f)
@@ -124,6 +138,8 @@ namespace BrainrotWaves
             return a + ab * t;
         }
 
+        static readonly Collider[] hitBuffer = new Collider[8];
+
         void Impact(Vector3 point, bool direct)
         {
             if (areaRadius > 0f)
@@ -132,8 +148,23 @@ namespace BrainrotWaves
             }
             else
             {
-                if (direct && !fromPlayer && PlayerController.Instance != null)
-                    PlayerController.Instance.Health.TakeDamageFrom(damage, transform.position - velocity.normalized * 2f);
+                if (direct && !fromPlayer)
+                {
+                    if (hitObjective && DefenseObjective.Instance != null) DefenseObjective.Instance.Damage(damage);
+                    else if (PlayerController.Instance != null) PlayerController.Instance.Health.TakeDamageFrom(damage, transform.position - velocity.normalized * 2f);
+                }
+                else if (direct && fromPlayer)
+                {
+                    int n = Physics.OverlapSphereNonAlloc(point, 0.9f, hitBuffer, Combat.EnemyMask, QueryTriggerInteraction.Ignore);
+                    for (int i = 0; i < n; i++)
+                    {
+                        var e = hitBuffer[i].GetComponentInParent<Enemy>();
+                        if (e == null || e.IsDead) continue;
+                        bool crit = Random.value < RunState.stats.critChance;
+                        e.TakeHit(damage * (crit ? 2f : 1f), crit, point);
+                        break;
+                    }
+                }
                 FX.Burst(point, color, 3, 4f, 0.12f, 0.5f);
                 Particles.Sparkle(point, color, 8, 3f, 0.18f);
             }

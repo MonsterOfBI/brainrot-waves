@@ -15,11 +15,11 @@ namespace BrainrotWaves.EditorTools
             if (!assetPath.StartsWith("Assets/Resources/Audio") && !assetPath.StartsWith("Assets/Resources/Music") && !ambientClip) return;
             var importer = (AudioImporter)assetImporter;
             bool music = assetPath.StartsWith("Assets/Resources/Music") || ambientClip;
-            importer.forceToMono = !music || ambientClip;
+            importer.forceToMono = true; // моно: в два раза легче, в браузерной игре разница не слышна
             importer.loadInBackground = music;
             var settings = importer.defaultSampleSettings;
             settings.compressionFormat = AudioCompressionFormat.Vorbis;
-            settings.quality = ambientClip ? 0.25f : music ? 0.4f : 0.6f;
+            settings.quality = ambientClip ? 0.25f : music ? 0.32f : 0.6f;
             if (music) settings.sampleRateSetting = AudioSampleRateSetting.OptimizeSampleRate;
             settings.loadType = music ? AudioClipLoadType.Streaming : AudioClipLoadType.DecompressOnLoad;
             settings.preloadAudioData = !music;

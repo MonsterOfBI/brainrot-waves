@@ -70,7 +70,7 @@ namespace BrainrotWaves
 
         public void Setup(BrainrotInfo hero)
         {
-            maxJumps = hero.id == BrainrotId.Chimpanzini ? 2 : 1;
+            maxJumps = 1 + hero.extraJumps;
             if (cam != null) baseFov = cam.fieldOfView;
             cameraBase = cam != null ? cam.transform.localPosition : Vector3.zero;
             ApplyStats(true);
@@ -90,6 +90,15 @@ namespace BrainrotWaves
             transform.position = position;
             transform.rotation = Quaternion.Euler(0f, yaw, 0f);
             pitch = 0f;
+            verticalVelocity = 0f;
+            controller.enabled = true;
+        }
+
+        /// <summary>Мгновенно переместиться (навык «Телепорт»), не меняя направление взгляда.</summary>
+        public void MoveTo(Vector3 position)
+        {
+            controller.enabled = false;
+            transform.position = position;
             verticalVelocity = 0f;
             controller.enabled = true;
         }
@@ -146,7 +155,7 @@ namespace BrainrotWaves
                 jumpPressed = Controls.Down(GameAction.Jump);
             }
 
-            float speed = baseSpeed * stats.moveSpeedMultiplier * slowMultiplier * (sprint ? sprintMultiplier : 1f);
+            float speed = baseSpeed * stats.moveSpeedMultiplier * HeroAbility.SpeedBoost * slowMultiplier * (sprint ? sprintMultiplier : 1f);
             Vector3 move = (transform.right * input.x + transform.forward * input.y) * speed;
             MoveFraction = Mathf.MoveTowards(MoveFraction, input.magnitude * (sprint ? 1f : 0.7f), dt * 6f);
 

@@ -135,14 +135,14 @@ namespace BrainrotWaves
         }
     }
 
-    public enum GameAction { Forward, Back, Left, Right, Jump, Sprint, Reload, Ability, Weapon1, Weapon2, Weapon3 }
+    public enum GameAction { Forward, Back, Left, Right, Jump, Sprint, Reload, Ability, Weapon1, Weapon2, Weapon3, Ability2 }
 
     /// <summary>Переназначаемые клавиши. ЛКМ — выстрел, Esc — пауза (не меняются).</summary>
     public static class Controls
     {
         static readonly Key[] Defaults =
         {
-            Key.W, Key.S, Key.A, Key.D, Key.Space, Key.LeftShift, Key.R, Key.Q, Key.Digit1, Key.Digit2, Key.Digit3
+            Key.W, Key.S, Key.A, Key.D, Key.Space, Key.LeftShift, Key.R, Key.Q, Key.Digit1, Key.Digit2, Key.Digit3, Key.E
         };
 
         static Key[] keys;
@@ -222,7 +222,8 @@ namespace BrainrotWaves
                 case GameAction.Jump: return new LS("Прыжок", "Jump");
                 case GameAction.Sprint: return new LS("Бег", "Sprint");
                 case GameAction.Reload: return new LS("Перезарядка", "Reload");
-                case GameAction.Ability: return new LS("Способность", "Ability");
+                case GameAction.Ability: return new LS("Навык 1", "Skill 1");
+                case GameAction.Ability2: return new LS("Навык 2", "Skill 2");
                 case GameAction.Weapon1: return new LS("Оружие 1", "Weapon 1");
                 case GameAction.Weapon2: return new LS("Оружие 2", "Weapon 2");
                 default: return new LS("Оружие 3", "Weapon 3");

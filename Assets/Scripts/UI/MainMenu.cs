@@ -18,7 +18,7 @@ namespace BrainrotWaves
         float modelPop;
         RectTransform canvas;
         RectTransform overlay;
-        Text heroName, heroDescription, passiveText, abilityText, statsText, crystalsText, threatText, threatInfo;
+        Text crystalsText, threatText, threatInfo;
         Image heroColorBar;
         Button playButton;
         Text playLabel;
@@ -32,11 +32,14 @@ namespace BrainrotWaves
             Time.timeScale = 1f;
             GameSettings.EnsureLoaded();
             PlayerController.LockCursor(false);
-            selected = Mathf.Clamp(Meta.P.lastHero, 0, Brainrots.All.Length - 1);
+            mode = (GameMode)Mathf.Clamp(Meta.P.lastMode, 0, 2);
+            list = Brainrots.ForMode(mode);
+            selected = 0;
+            for (int i = 0; i < list.Length; i++) if ((int)list[i].id == Meta.P.lastHero) selected = i;
             BuildStage();
             BuildUI();
             SelectHero(selected);
-            SoundFX.PlayMusic(SoundFX.MenuMusic);
+            Music.Menu();
             SoundFX.PlayAmbient(null);
             Loc.Changed += RebuildUI;
         }
@@ -117,6 +120,12 @@ namespace BrainrotWaves
 
         // ---------------- Интерфейс ----------------
 
+        GameMode mode;
+        BrainrotInfo[] list;
+        readonly Button[] modeButtons = new Button[3];
+        RectTransform infoPanel;
+        RectTransform heroDetails;
+
         void RebuildUI()
         {
             bool settingsOpen = SettingsScreen.IsOpen;
@@ -128,111 +137,159 @@ namespace BrainrotWaves
             if (settingsOpen) SettingsScreen.Show(overlay, null);
         }
 
+        static LS ModeTitle(GameMode m)
+        {
+            switch (m)
+            {
+                case GameMode.Survival: return new LS("Выживание", "Survival");
+                case GameMode.Defense: return new LS("Защита", "Defense");
+                default: return new LS("Сюжет", "Story");
+            }
+        }
+
+        static IconKind ModeIcon(GameMode m) => m == GameMode.Survival ? IconKind.Infinity : m == GameMode.Defense ? IconKind.Home : IconKind.Book;
+
+        static string ModeDescription(GameMode m)
+        {
+            switch (m)
+            {
+                case GameMode.Survival: return Loc.T("Бесконечные волны всех 26 брейнротов. Босс каждые 10 волн. Работает Лаборатория.", "Endless waves of all 26 brainrots. A boss every 10 waves. The Lab works here.");
+                case GameMode.Defense: return Loc.T("Защити пиццерию Нонны 15 волн. Брейнроты идут к печи. Работает Лаборатория.", "Defend Nonna's pizzeria for 15 waves. Brainrots go for the oven. The Lab works here.");
+                default: return Loc.T("5 арен, 5 боссов-хозяев. Только сила героя и удача — Лаборатория не помогает.", "5 arenas, 5 boss owners. Just your hero and luck — the Lab doesn't help here.");
+            }
+        }
+
         void BuildUI()
         {
             UIKit.EnsureEventSystem();
             canvas = UIKit.Canvas("MenuCanvas", 10);
             var root = canvas;
+            list = Brainrots.ForMode(mode);
 
-            var title = UIKit.Text(root, "Title", "BRAINROT WAVES", 88, TextAnchor.UpperLeft, UIKit.Accent, true);
-            UIKit.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(70f, -50f), new Vector2(820f, 120f));
-            title.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(6f, -6f);
-            title.gameObject.AddComponent<Wobble>();
-            var subtitle = UIKit.Text(root, "Subtitle", new LS("Шутер с волнами итальянских брейнротов", "A wave shooter with Italian brainrots"), 34, TextAnchor.UpperLeft, Color.white);
-            UIKit.Place(subtitle.rectTransform, new Vector2(0f, 1f), new Vector2(76f, -170f), new Vector2(1200f, 50f));
+            var title = UIKit.Text(root, "Title", "BRAINROT WAVES", 84, TextAnchor.UpperLeft, UIKit.Accent, true);
+            UIKit.Place(title.rectTransform, new Vector2(0f, 1f), new Vector2(70f, -44f), new Vector2(900f, 110f));
+            title.gameObject.AddComponent<Shadow>().effectDistance = new Vector2(5f, -5f);
+            title.gameObject.AddComponent<Wobble>().angle = 1f;
+            var subtitle = UIKit.Text(root, "Subtitle", new LS("Шутер с волнами итальянских брейнротов", "A wave shooter with Italian brainrots"), 26, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.8f));
+            UIKit.Place(subtitle.rectTransform, new Vector2(0f, 1f), new Vector2(76f, -138f), new Vector2(1000f, 40f));
             SlideIn.Add(subtitle, new Vector2(-300f, 0f), 0.1f);
 
             // Кристаллы и кнопки сверху справа
             var crystalPanel = UIKit.Image(root, "Crystals", UIKit.Panel);
-            UIKit.Place(crystalPanel.rectTransform, new Vector2(1f, 1f), new Vector2(-60f, -40f), new Vector2(240f, 70f), new Vector2(1f, 1f));
-            UIKit.Icon(crystalPanel.rectTransform, "Icon", IconKind.Crystal, UIKit.Crystal, new Vector2(0f, 0.5f), new Vector2(14f, 0f), 48f, new Vector2(0f, 0.5f)).gameObject.AddComponent<Pulse>();
-            crystalsText = UIKit.Text(crystalPanel.rectTransform, "Value", "", 38, TextAnchor.MiddleRight, UIKit.Crystal, true);
-            UIKit.Place(crystalsText.rectTransform, new Vector2(1f, 0.5f), new Vector2(-18f, 0f), new Vector2(160f, 60f), new Vector2(1f, 0.5f));
+            UIKit.Place(crystalPanel.rectTransform, new Vector2(1f, 1f), new Vector2(-60f, -40f), new Vector2(220f, 64f), new Vector2(1f, 1f));
+            UIKit.Icon(crystalPanel.rectTransform, "Icon", IconKind.Crystal, UIKit.Crystal, new Vector2(0f, 0.5f), new Vector2(14f, 0f), 42f, new Vector2(0f, 0.5f)).gameObject.AddComponent<Pulse>();
+            crystalsText = UIKit.Text(crystalPanel.rectTransform, "Value", "", 32, TextAnchor.MiddleRight, UIKit.Crystal, true);
+            UIKit.Place(crystalsText.rectTransform, new Vector2(1f, 0.5f), new Vector2(-16f, 0f), new Vector2(150f, 56f), new Vector2(1f, 0.5f));
             SlideIn.Add(crystalPanel, new Vector2(0f, 120f), 0.1f);
 
-            var lab = UIKit.IconButton(root, "Lab", IconKind.Flask, new LS("Лаборатория", "Lab"), GameAssets.Hex("#00897B"), ShowLab, 28);
-            UIKit.Place(lab.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-320f, -40f), new Vector2(290f, 70f), new Vector2(1f, 1f));
+            var lab = UIKit.IconButton(root, "Lab", IconKind.Flask, new LS("Лаборатория", "Lab"), GameAssets.Hex("#00796B"), ShowLab, 24);
+            UIKit.Place(lab.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-296f, -40f), new Vector2(260f, 64f), new Vector2(1f, 1f));
             SlideIn.Add(lab, new Vector2(0f, 120f), 0.15f);
-            var settings = UIKit.IconButton(root, "Settings", IconKind.Gear, new LS("Настройки", "Settings"), new Color(0.25f, 0.4f, 0.75f, 1f), () => SettingsScreen.Show(overlay, null), 28);
-            UIKit.Place(settings.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-630f, -40f), new Vector2(270f, 70f), new Vector2(1f, 1f));
+            var settings = UIKit.IconButton(root, "Settings", IconKind.Gear, new LS("Настройки", "Settings"), new Color(0.2f, 0.35f, 0.7f, 1f), () => SettingsScreen.Show(overlay, null), 24);
+            UIKit.Place(settings.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-572f, -40f), new Vector2(250f, 64f), new Vector2(1f, 1f));
             SlideIn.Add(settings, new Vector2(0f, 120f), 0.2f);
-            var lang = UIKit.IconButton(root, "Lang", IconKind.Globe, new LS("RU", "EN"), UIKit.Purple, Loc.Toggle, 28);
-            UIKit.Place(lang.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-920f, -40f), new Vector2(150f, 70f), new Vector2(1f, 1f));
+            var lang = UIKit.IconButton(root, "Lang", IconKind.Globe, new LS("RU", "EN"), UIKit.Purple, Loc.Toggle, 24);
+            UIKit.Place(lang.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-838f, -40f), new Vector2(140f, 64f), new Vector2(1f, 1f));
             SlideIn.Add(lang, new Vector2(0f, 120f), 0.25f);
 
-            // Список героев слева
-            var listLabel = UIKit.Text(root, "Choose", new LS("ВЫБЕРИ ГЕРОЯ", "CHOOSE A HERO"), 30, TextAnchor.UpperLeft, UIKit.Pink, true);
-            UIKit.Place(listLabel.rectTransform, new Vector2(0f, 1f), new Vector2(76f, -250f), new Vector2(500f, 40f));
-            for (int i = 0; i < Brainrots.All.Length; i++)
+            // Выбор режима
+            GameMode[] modes = { GameMode.Story, GameMode.Survival, GameMode.Defense };
+            for (int i = 0; i < 3; i++)
+            {
+                var m = modes[i];
+                var b = UIKit.IconButton(root, "Mode" + i, ModeIcon(m), ModeTitle(m), m == mode ? UIKit.PlayColor : UIKit.PanelLight, () => SetMode(m), 19);
+                UIKit.Place(b.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(70f + i * 176f, -196f), new Vector2(168f, 60f), new Vector2(0f, 1f));
+                modeButtons[i] = b;
+                SlideIn.Add(b, new Vector2(-400f, 0f), 0.05f + i * 0.05f, 0.35f);
+            }
+            var modeDesc = UIKit.Text(root, "ModeDesc", ModeDescription(mode), 19, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.7f));
+            UIKit.Place(modeDesc.rectTransform, new Vector2(0f, 1f), new Vector2(74f, -266f), new Vector2(520f, 60f));
+
+            // Герои режима
+            bool many = list.Length > 8;
+            int columns = many ? 3 : 1;
+            float w = many ? 170f : 520f, h = many ? 56f : 72f, gap = 6f;
+            for (int i = 0; i < list.Length; i++)
             {
                 int index = i;
-                var info = Brainrots.All[i];
-                var b = UIKit.Button(root, "Hero" + i, info.name, UIKit.Panel, () => SelectHero(index), 28);
+                var info = list[i];
+                int col = i % columns, row = i / columns;
+                var b = UIKit.Button(root, "Hero" + i, many ? (string)info.shortName : (string)info.name, UIKit.Panel, () => SelectHero(index), many ? 17 : 26);
                 var rect = b.GetComponent<RectTransform>();
-                UIKit.Place(rect, new Vector2(0f, 1f), new Vector2(70f, -300f - i * 78f), new Vector2(460f, 66f));
+                UIKit.Place(rect, new Vector2(0f, 1f), new Vector2(70f + col * (w + gap), -336f - row * (h + gap)), new Vector2(w, h));
                 var label = rect.GetComponentInChildren<Text>();
                 label.alignment = TextAnchor.MiddleLeft;
-                label.rectTransform.offsetMin = new Vector2(34f, 0f);
+                label.rectTransform.offsetMin = new Vector2(many ? 20f : 34f, 0f);
+                label.rectTransform.offsetMax = new Vector2(many ? -26f : -50f, 0f);
                 var swatch = UIKit.Image(rect, "Color", info.themeColor);
-                UIKit.Place(swatch.rectTransform, new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(14f, 46f), new Vector2(0f, 0.5f));
-                var lockIcon = UIKit.Icon(rect, "Lock", IconKind.Lock, new Color(1f, 1f, 1f, 0.8f), new Vector2(1f, 0.5f), new Vector2(-14f, 0f), 38f, new Vector2(1f, 0.5f));
+                UIKit.Place(swatch.rectTransform, new Vector2(0f, 0.5f), new Vector2(7f, 0f), new Vector2(many ? 7f : 12f, h - 16f), new Vector2(0f, 0.5f));
+                var lockIcon = UIKit.Icon(rect, "Lock", IconKind.Lock, new Color(1f, 1f, 1f, 0.75f), new Vector2(1f, 0.5f), new Vector2(-8f, 0f), many ? 22f : 34f, new Vector2(1f, 0.5f));
                 heroLocks.Add(lockIcon);
                 heroButtons.Add(b.GetComponent<Image>());
-                SlideIn.Add(b, new Vector2(-500f, 0f), 0.1f + i * 0.05f, 0.4f);
+                SlideIn.Add(b, new Vector2(-500f, 0f), 0.08f + i * 0.015f, 0.35f);
             }
 
             // Описание справа
             var panel = UIKit.Image(root, "InfoPanel", UIKit.Panel);
-            UIKit.Place(panel.rectTransform, new Vector2(1f, 0.5f), new Vector2(-60f, -10f), new Vector2(640f, 720f), new Vector2(1f, 0.5f));
+            UIKit.Place(panel.rectTransform, new Vector2(1f, 0.5f), new Vector2(-60f, 0f), new Vector2(660f, 800f), new Vector2(1f, 0.5f));
             SlideIn.Add(panel, new Vector2(700f, 0f), 0.15f, 0.5f);
-            var pr = panel.rectTransform;
-            heroColorBar = UIKit.Image(pr, "Bar", Color.white);
-            UIKit.Place(heroColorBar.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -16f), new Vector2(608f, 14f), new Vector2(0.5f, 1f));
-            heroName = UIKit.Text(pr, "Name", "", 46, TextAnchor.UpperLeft, Color.white, true);
-            UIKit.Place(heroName.rectTransform, new Vector2(0f, 1f), new Vector2(28f, -44f), new Vector2(590f, 60f));
-            heroDescription = UIKit.Text(pr, "Desc", "", 26, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.85f));
-            UIKit.Place(heroDescription.rectTransform, new Vector2(0f, 1f), new Vector2(28f, -110f), new Vector2(590f, 80f));
-            passiveText = UIKit.Text(pr, "Passive", "", 26, TextAnchor.UpperLeft, Color.white);
-            UIKit.Place(passiveText.rectTransform, new Vector2(0f, 1f), new Vector2(28f, -200f), new Vector2(590f, 100f));
-            abilityText = UIKit.Text(pr, "Ability", "", 26, TextAnchor.UpperLeft, Color.white);
-            UIKit.Place(abilityText.rectTransform, new Vector2(0f, 1f), new Vector2(28f, -300f), new Vector2(590f, 110f));
-            statsText = UIKit.Text(pr, "Stats", "", 24, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.75f));
-            UIKit.Place(statsText.rectTransform, new Vector2(0f, 1f), new Vector2(28f, -410f), new Vector2(590f, 90f));
+            infoPanel = panel.rectTransform;
+            heroColorBar = UIKit.Image(infoPanel, "Bar", Color.white);
+            UIKit.Place(heroColorBar.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(630f, 8f), new Vector2(0.5f, 1f));
 
-            // Уровень угрозы
-            var threatRow = UIKit.Rect(pr, "Threat");
-            UIKit.Place(threatRow, new Vector2(0.5f, 0f), new Vector2(0f, 136f), new Vector2(590f, 90f), new Vector2(0.5f, 0f));
-            var minus = UIKit.Button(threatRow, "Minus", "<", new Color(0.22f, 0.17f, 0.34f, 1f), () => ChangeThreat(-1), 26);
-            UIKit.Place(minus.GetComponent<RectTransform>(), new Vector2(0f, 1f), Vector2.zero, new Vector2(60f, 50f), new Vector2(0f, 1f));
-            var plus = UIKit.Button(threatRow, "Plus", ">", new Color(0.22f, 0.17f, 0.34f, 1f), () => ChangeThreat(1), 26);
-            UIKit.Place(plus.GetComponent<RectTransform>(), new Vector2(1f, 1f), Vector2.zero, new Vector2(60f, 50f), new Vector2(1f, 1f));
-            threatText = UIKit.Text(threatRow, "Value", "", 30, TextAnchor.MiddleCenter, UIKit.Pink, true);
-            UIKit.Place(threatText.rectTransform, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(440f, 50f), new Vector2(0.5f, 1f));
-            threatInfo = UIKit.Text(threatRow, "Info", "", 20, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.65f));
-            UIKit.Place(threatInfo.rectTransform, new Vector2(0.5f, 0f), Vector2.zero, new Vector2(590f, 36f), new Vector2(0.5f, 0f));
-            UpdateThreat();
-
-            playButton = UIKit.Button(pr, "Play", "", UIKit.PlayColor, OnPlayPressed, 46);
-            UIKit.Place(playButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0f, 26f), new Vector2(580f, 96f), new Vector2(0.5f, 0f));
+            playButton = UIKit.Button(infoPanel, "Play", "", UIKit.PlayColor, OnPlayPressed, 40);
+            UIKit.Place(playButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(610f, 88f), new Vector2(0.5f, 0f));
             playLabel = playButton.GetComponentInChildren<Text>();
-            playButton.gameObject.AddComponent<Pulse>().amount = 0.025f;
+            playButton.gameObject.AddComponent<Pulse>().amount = 0.02f;
 
-            var recordText = UIKit.Text(root, "Record", "", 24, TextAnchor.LowerLeft, new Color(1f, 1f, 1f, 0.7f));
-            UIKit.Place(recordText.rectTransform, new Vector2(0f, 0f), new Vector2(76f, 40f), new Vector2(1000f, 90f));
+            // Уровень угрозы (только сюжет)
+            if (mode == GameMode.Story)
+            {
+                var threatRow = UIKit.Rect(infoPanel, "Threat");
+                UIKit.Place(threatRow, new Vector2(0.5f, 0f), new Vector2(0f, 126f), new Vector2(610f, 84f), new Vector2(0.5f, 0f));
+                var minus = UIKit.Button(threatRow, "Minus", "<", UIKit.PanelLight, () => ChangeThreat(-1), 26);
+                UIKit.Place(minus.GetComponent<RectTransform>(), new Vector2(0f, 1f), Vector2.zero, new Vector2(56f, 46f), new Vector2(0f, 1f));
+                var plus = UIKit.Button(threatRow, "Plus", ">", UIKit.PanelLight, () => ChangeThreat(1), 26);
+                UIKit.Place(plus.GetComponent<RectTransform>(), new Vector2(1f, 1f), Vector2.zero, new Vector2(56f, 46f), new Vector2(1f, 1f));
+                threatText = UIKit.Text(threatRow, "Value", "", 26, TextAnchor.MiddleCenter, UIKit.Pink, true);
+                UIKit.Place(threatText.rectTransform, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(460f, 46f), new Vector2(0.5f, 1f));
+                threatInfo = UIKit.Text(threatRow, "Info", "", 17, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.65f));
+                UIKit.Place(threatInfo.rectTransform, new Vector2(0.5f, 0f), Vector2.zero, new Vector2(610f, 34f), new Vector2(0.5f, 0f));
+                UpdateThreat();
+            }
+            else threatText = threatInfo = null;
+
+            var recordText = UIKit.Text(root, "Record", "", 20, TextAnchor.LowerLeft, new Color(1f, 1f, 1f, 0.6f));
+            UIKit.Place(recordText.rectTransform, new Vector2(0f, 0f), new Vector2(76f, 26f), new Vector2(1100f, 60f));
             var p = Meta.P;
-            recordText.text = Loc.T("Лучший результат: ", "Best result: ") + p.bestArena + Loc.T(" из 5 арен · Побед: ", " of 5 arenas · Wins: ") + p.wins +
-                              Loc.T(" · Лучшее комбо: ", " · Best combo: ") + p.bestCombo +
-                              "\n" + Loc.T("Стрелки ←/→ — выбор героя, Enter — играть", "Arrows ←/→ — choose hero, Enter — play");
+            string rec;
+            if (mode == GameMode.Survival) rec = Loc.T("Рекорд выживания: волна ", "Survival record: wave ") + p.bestSurvivalWave;
+            else if (mode == GameMode.Defense) rec = Loc.T("Рекорд защиты: волна ", "Defense record: wave ") + p.bestDefenseWave + Loc.T(" · побед: ", " · wins: ") + p.defenseWins;
+            else rec = Loc.T("Лучший результат: ", "Best result: ") + p.bestArena + Loc.T(" из 5 арен · Побед: ", " of 5 arenas · Wins: ") + p.wins;
+            recordText.text = rec + Loc.T(" · Боссов побеждено: ", " · Bosses defeated: ") + p.bossesTotal + "\n" + Loc.T("Стрелки — выбор героя, Enter — играть", "Arrows — choose hero, Enter — play");
 
-            var quit = UIKit.IconButton(root, "Quit", IconKind.Exit, new LS("Выход", "Quit"), new Color(0.3f, 0.2f, 0.4f, 0.9f), Quit, 26);
-            UIKit.Place(quit.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(-60f, 30f), new Vector2(210f, 60f), new Vector2(1f, 0f));
-
-            var credits = UIKit.IconButton(root, "Credits", IconKind.Star, new LS("Авторы", "Credits"), new Color(0.3f, 0.2f, 0.4f, 0.9f), ShowCredits, 26);
-            UIKit.Place(credits.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(-290f, 30f), new Vector2(210f, 60f), new Vector2(1f, 0f));
+            var quit = UIKit.IconButton(root, "Quit", IconKind.Exit, new LS("Выход", "Quit"), UIKit.PanelLight, Quit, 22);
+            UIKit.Place(quit.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(-60f, 24f), new Vector2(180f, 54f), new Vector2(1f, 0f));
+            var credits = UIKit.IconButton(root, "Credits", IconKind.Star, new LS("Авторы", "Credits"), UIKit.PanelLight, ShowCredits, 22);
+            UIKit.Place(credits.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(-250f, 24f), new Vector2(190f, 54f), new Vector2(1f, 0f));
 
             overlay = UIKit.Rect(root, "Overlay");
             UIKit.Stretch(overlay);
             UpdateCrystals();
+        }
+
+        void SetMode(GameMode m)
+        {
+            if (m == mode) return;
+            var prev = list[Mathf.Clamp(selected, 0, list.Length - 1)].id;
+            mode = m;
+            Meta.P.lastMode = (int)m;
+            Meta.Save();
+            list = Brainrots.ForMode(mode);
+            selected = 0;
+            for (int i = 0; i < list.Length; i++) if (list[i].id == prev) selected = i;
+            RebuildUI();
+            SelectHero(selected);
         }
 
         void UpdateCrystals()
@@ -258,11 +315,12 @@ namespace BrainrotWaves
 
         void UpdateThreat()
         {
+            if (threatText == null) return;
             var p = Meta.P;
             int t = Mathf.Clamp(p.selectedThreat, 0, p.threatUnlocked);
             threatText.text = Loc.T("Угроза: ", "Threat: ") + t + " / " + Meta.MaxThreat;
             if (p.threatUnlocked == 0)
-                threatInfo.text = Loc.T("Победи, чтобы открыть уровни угрозы", "Win a run to unlock threat levels");
+                threatInfo.text = Loc.T("Пройди сюжет, чтобы открыть уровни угрозы", "Beat the story to unlock threat levels");
             else if (t == 0)
                 threatInfo.text = Loc.T("Обычная сложность", "Normal difficulty");
             else
@@ -275,12 +333,12 @@ namespace BrainrotWaves
 
         void SelectHero(int index, bool rebuildModel = true)
         {
-            selected = (index + Brainrots.All.Length) % Brainrots.All.Length;
-            var info = Brainrots.All[selected];
+            selected = (index + list.Length) % list.Length;
+            var info = list[selected];
             bool unlocked = Meta.P.HeroUnlocked(info.id);
             if (unlocked)
             {
-                Meta.P.lastHero = selected;
+                Meta.P.lastHero = (int)info.id;
                 Meta.Save();
             }
 
@@ -289,7 +347,7 @@ namespace BrainrotWaves
                 if (currentModel != null) Destroy(currentModel.gameObject);
                 currentModel = BrainrotModels.Build(info.id, turntable);
                 currentModel.moveAmount = 0f;
-                float scale = info.id == BrainrotId.Bombardiro ? 0.75f : 1f;
+                float scale = info.behavior == EnemyBehavior.Flyer ? 0.75f : 1f;
                 currentModel.transform.localScale = Vector3.one * scale;
                 currentModel.Init();
                 currentModel.Roar(0.8f);
@@ -298,40 +356,81 @@ namespace BrainrotWaves
                 Particles.Sparkle(new Vector3(0f, 1.2f, 0f), info.themeColor, 25, 4f, 0.2f);
             }
 
-            heroName.text = info.name;
-            heroName.color = info.themeColor;
+            // Карточка героя (перестраивается целиком)
+            if (heroDetails != null) Destroy(heroDetails.gameObject);
+            heroDetails = UIKit.Rect(infoPanel, "Details");
+            UIKit.Stretch(heroDetails);
+            var d = heroDetails;
             heroColorBar.color = info.themeColor;
-            heroDescription.text = info.description;
-            passiveText.text = "<color=#FFC93C><b>" + Loc.T("Пассивка: ", "Passive: ") + info.passiveName + "</b></color>\n" + info.passiveDescription;
-            abilityText.text = "<color=#3DE0FF><b>" + Controls.KeyName(GameAction.Ability) + ": " + info.abilityName + "</b></color>\n" + info.abilityDescription +
-                               Loc.T(" (перезарядка ", " (cooldown ") + info.abilityCooldown + Loc.T(" с)", " s)");
-            statsText.text = Loc.T("Здоровье: ", "Health: ") + info.heroMaxHealth + Loc.T(" · Скорость: ×", " · Speed: ×") + info.heroSpeedMultiplier.ToString("0.00") +
-                             "\n" + Loc.T("Его арена (", "His arena (") + info.arenaName + Loc.T(") в забеге пропускается", ") is skipped in the run");
+
+            var name = UIKit.Text(d, "Name", info.name, 42, TextAnchor.MiddleLeft, info.themeColor, true);
+            UIKit.Place(name.rectTransform, new Vector2(0f, 1f), new Vector2(26f, -30f), new Vector2(610f, 60f), new Vector2(0f, 1f));
+            var desc = UIKit.Text(d, "Desc", info.description, 20, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.8f));
+            UIKit.Place(desc.rectTransform, new Vector2(0f, 1f), new Vector2(28f, -94f), new Vector2(604f, 56f), new Vector2(0f, 1f));
+
+            // Пассивка
+            var pas = UIKit.Image(d, "Passive", UIKit.PanelLight);
+            UIKit.Place(pas.rectTransform, new Vector2(0f, 1f), new Vector2(24f, -156f), new Vector2(612f, 62f), new Vector2(0f, 1f));
+            UIKit.Icon(pas.rectTransform, "Icon", IconKind.Star, UIKit.Accent, new Vector2(0f, 0.5f), new Vector2(14f, 0f), 36f, new Vector2(0f, 0.5f));
+            var pt = UIKit.Text(pas.rectTransform, "T", "<color=#FFC93C>" + Loc.T("Пассивка · ", "Passive · ") + info.passiveName + "</color>\n" + info.passiveDescription, 18, TextAnchor.MiddleLeft, Color.white, false, false);
+            UIKit.Place(pt.rectTransform, new Vector2(0f, 0.5f), new Vector2(62f, 0f), new Vector2(540f, 58f), new Vector2(0f, 0.5f));
+
+            // Навыки
+            GameUI.SkillCard(d, new Vector2(24f, -228f), 612f, info.q, Controls.KeyName(GameAction.Ability), info.themeColor);
+            GameUI.SkillCard(d, new Vector2(24f, -334f), 612f, info.e, Controls.KeyName(GameAction.Ability2), info.themeColor);
+
+            // Характеристики
+            Chip(d, new Vector2(24f, -442f), IconKind.Heart, GameAssets.Hex("#FF5F7E"), Loc.T("Здоровье", "Health"), Mathf.RoundToInt(info.heroMaxHealth).ToString());
+            Chip(d, new Vector2(334f, -442f), IconKind.Boot, UIKit.Cyan, Loc.T("Скорость", "Speed"), "×" + info.heroSpeedMultiplier.ToString("0.00"));
+
+            // Открытие / заметка
+            string note;
+            if (!unlocked)
+            {
+                string goal = Meta.GoalText(info);
+                note = "<color=#FF8FB1>" + Loc.T("Закрыт. ", "Locked. ") + "</color>" +
+                       (goal.Length > 0 ? Loc.T("Задание: ", "Goal: ") + goal + Loc.T("\nили купи за кристаллы", "\nor buy with crystals") : Loc.T("Открой за кристаллы", "Unlock with crystals"));
+            }
+            else if (mode == GameMode.Story) note = Loc.T("Его арена (", "His arena (") + info.arenaName + Loc.T(") в забеге пропускается", ") is skipped in the run");
+            else note = info.story ? Loc.T("Сюжетный герой", "Story hero") : Loc.T("Встречается врагом в выживании и защите", "Appears as an enemy in survival and defense");
+            var nt = UIKit.Text(d, "Note", note, 18, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.7f));
+            UIKit.Place(nt.rectTransform, new Vector2(0f, 1f), new Vector2(28f, -512f), new Vector2(604f, 64f), new Vector2(0f, 1f));
 
             int price = Meta.HeroPrice(info.id);
             if (unlocked)
             {
-                playLabel.text = Loc.T("ИГРАТЬ", "PLAY");
+                playLabel.text = Loc.T("ИГРАТЬ", "PLAY") + " · " + ModeTitle(mode).ToUpper();
                 playButton.GetComponent<Image>().color = UIKit.PlayColor;
             }
             else
             {
                 bool can = Meta.P.crystals >= price;
                 playLabel.text = Loc.T("ОТКРЫТЬ: ", "UNLOCK: ") + Loc.Plural(price, "кристалл", "кристалла", "кристаллов", "crystal", "crystals");
-                playButton.GetComponent<Image>().color = can ? GameAssets.Hex("#00897B") : new Color(0.3f, 0.25f, 0.35f, 1f);
+                playButton.GetComponent<Image>().color = can ? GameAssets.Hex("#00796B") : new Color(0.25f, 0.22f, 0.3f, 1f);
             }
 
             for (int i = 0; i < heroButtons.Count; i++)
             {
-                var hi = Brainrots.All[i];
-                heroButtons[i].color = i == selected ? new Color(hi.themeColor.r * 0.6f, hi.themeColor.g * 0.6f, hi.themeColor.b * 0.6f, 0.95f) : UIKit.Panel;
+                var hi = list[i];
+                heroButtons[i].color = i == selected ? new Color(hi.themeColor.r * 0.55f, hi.themeColor.g * 0.55f, hi.themeColor.b * 0.55f, 0.95f) : UIKit.Panel;
                 heroLocks[i].enabled = !Meta.P.HeroUnlocked(hi.id);
             }
         }
 
+        static void Chip(RectTransform parent, Vector2 pos, IconKind icon, Color color, string label, string value)
+        {
+            var chip = UIKit.Image(parent, "Chip", UIKit.PanelLight);
+            UIKit.Place(chip.rectTransform, new Vector2(0f, 1f), pos, new Vector2(302f, 54f), new Vector2(0f, 1f));
+            UIKit.Icon(chip.rectTransform, "Icon", icon, color, new Vector2(0f, 0.5f), new Vector2(12f, 0f), 32f, new Vector2(0f, 0.5f));
+            var l = UIKit.Text(chip.rectTransform, "L", label, 18, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0.65f), false, false);
+            UIKit.Place(l.rectTransform, new Vector2(0f, 0.5f), new Vector2(54f, 0f), new Vector2(150f, 48f), new Vector2(0f, 0.5f));
+            var v = UIKit.Text(chip.rectTransform, "V", value, 22, TextAnchor.MiddleRight, Color.white, true, false);
+            UIKit.Place(v.rectTransform, new Vector2(1f, 0.5f), new Vector2(-12f, 0f), new Vector2(120f, 48f), new Vector2(1f, 0.5f));
+        }
+
         void OnPlayPressed()
         {
-            var info = Brainrots.All[selected];
+            var info = list[selected];
             if (Meta.P.HeroUnlocked(info.id))
             {
                 Play();
@@ -351,9 +450,9 @@ namespace BrainrotWaves
         void Play()
         {
             if (SceneLoader.Busy) return;
-            var info = Brainrots.All[selected];
+            var info = list[selected];
             if (!Meta.P.HeroUnlocked(info.id)) return;
-            RunState.StartNew(info.id);
+            RunState.StartNew(info.id, mode);
             SceneLoader.Load("Game");
         }
 
@@ -478,8 +577,8 @@ namespace BrainrotWaves
             var sr = screen.rectTransform;
             var title = UIKit.Text(sr, "Title", new LS("АВТОРЫ", "CREDITS"), 70, TextAnchor.MiddleCenter, UIKit.Accent, true);
             UIKit.Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(1400f, 90f), new Vector2(0.5f, 1f));
-            string text = Loc.T("<b>Brainrot Waves</b>\n\n<color=#FFC93C>3D-модели, звуки, частицы</color>\nKenney (kenney.nl) — CC0\nCartoon FX Remaster — Jean Moreno (JMO)\n\n<color=#FFC93C>Шрифты</color>\nRubik, Russo One — SIL Open Font License\n\n<color=#FFC93C>Музыка и звуки окружения</color>\nPixabay: alanajordan, Art_Roseman, DesiFreeMusic, SlimeyFox, AllWorldMusic,\nWhite_Records, Denis-Pavlov-Music и др. — Pixabay Content License\n\n<color=#FFC93C>Спасибо</color>\nвсем авторам бесплатных ассетов!",
-                "<b>Brainrot Waves</b>\n\n<color=#FFC93C>3D models, sounds, particles</color>\nKenney (kenney.nl) — CC0\nCartoon FX Remaster — Jean Moreno (JMO)\n\n<color=#FFC93C>Fonts</color>\nRubik, Russo One — SIL Open Font License\n\n<color=#FFC93C>Music and ambience</color>\nPixabay: alanajordan, Art_Roseman, DesiFreeMusic, SlimeyFox, AllWorldMusic,\nWhite_Records, Denis-Pavlov-Music and others — Pixabay Content License\n\n<color=#FFC93C>Thanks</color>\nto all authors of free assets!");
+            string text = Loc.T("<b>Brainrot Waves</b>\n\n<color=#FFC93C>3D-модели, звуки, частицы</color>\nKenney (kenney.nl) — CC0\nCartoon FX Remaster — Jean Moreno (JMO)\n\n<color=#FFC93C>Шрифты</color>\nUnbounded, Exo 2 — SIL Open Font License\n\n<color=#FFC93C>Музыка и звуки окружения</color>\nKevin MacLeod (incompetech.com), CC BY 4.0\nPixabay: alanajordan, Art_Roseman, DesiFreeMusic, SlimeyFox, AllWorldMusic,\nWhite_Records, Denis-Pavlov-Music и др. — Pixabay Content License\n\n<color=#FFC93C>Спасибо</color>\nвсем авторам бесплатных ассетов!",
+                "<b>Brainrot Waves</b>\n\n<color=#FFC93C>3D models, sounds, particles</color>\nKenney (kenney.nl) — CC0\nCartoon FX Remaster — Jean Moreno (JMO)\n\n<color=#FFC93C>Fonts</color>\nUnbounded, Exo 2 — SIL Open Font License\n\n<color=#FFC93C>Music and ambience</color>\nKevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0\nPixabay: alanajordan, Art_Roseman, DesiFreeMusic, SlimeyFox, AllWorldMusic,\nWhite_Records, Denis-Pavlov-Music and others — Pixabay Content License\n\n<color=#FFC93C>Thanks</color>\nto all authors of free assets!");
             var body = UIKit.Text(sr, "Body", text, 30, TextAnchor.UpperCenter, Color.white);
             UIKit.Place(body.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -180f), new Vector2(1500f, 700f), new Vector2(0.5f, 1f));
             var back = UIKit.IconButton(sr, "Back", IconKind.Back, new LS("Назад", "Back"), UIKit.Purple, () => Destroy(screen.gameObject), 32);

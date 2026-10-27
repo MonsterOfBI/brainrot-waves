@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: d725b79e512634d4f9c8970624eb674a
+guid: 4d2fb934d3341514489cf30b4685b41a
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
@@ -9,7 +9,7 @@ TrueTypeFontImporter:
   characterPadding: 1
   includeFontData: 1
   fontNames:
-  - Rubik
+  - Exo 2
   fallbackFontReferences: []
   customCharacters: 
   fontRenderingMode: 0

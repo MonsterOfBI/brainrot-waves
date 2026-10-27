@@ -5,26 +5,40 @@ namespace BrainrotWaves
     /// <summary>Визуальные эффекты: взрывы, осколки, цифры урона, вспышки, тряска камеры.</summary>
     public static class FX
     {
-        static Font font, titleFont;
+        static Font font, boldFont, titleFont;
 
-        /// <summary>Основной шрифт (Rubik, есть кириллица). Если файла нет — встроенный.</summary>
+        static Font LoadFont(string name)
+        {
+            var f = Resources.Load<Font>("Fonts/" + name);
+            return f != null ? f : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+
+        /// <summary>Основной шрифт интерфейса (Exo 2, есть кириллица).</summary>
         public static Font Font
         {
             get
             {
-                if (font == null) font = Resources.Load<Font>("Fonts/Rubik");
-                if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (font == null) font = LoadFont("Body");
                 return font;
             }
         }
 
-        /// <summary>Шрифт заголовков и цифр урона (Russo One).</summary>
+        /// <summary>Жирный основной шрифт (Exo 2 ExtraBold).</summary>
+        public static Font BoldFont
+        {
+            get
+            {
+                if (boldFont == null) boldFont = LoadFont("BodyBold");
+                return boldFont;
+            }
+        }
+
+        /// <summary>Шрифт заголовков и цифр урона (Unbounded Bold).</summary>
         public static Font TitleFont
         {
             get
             {
-                if (titleFont == null) titleFont = Resources.Load<Font>("Fonts/RussoOne");
-                if (titleFont == null) titleFont = Font;
+                if (titleFont == null) titleFont = LoadFont("Title");
                 return titleFont;
             }
         }

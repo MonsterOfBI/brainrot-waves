@@ -7,7 +7,10 @@ using UnityEngine.Rendering.Universal;
 namespace BrainrotWaves
 {
     /// <summary>
-    /// Управляет забегом: арены → 5 волн с выбором улучшений → заставка и бой с боссом → магазин → следующая арена.
+    /// Управляет забегом в одном из трёх режимов:
+    /// • Сюжет — 5 арен: 5 волн с выбором улучшений → заставка и бой с боссом → магазин → следующая арена.
+    /// • Выживание — бесконечные волны всех 26 брейнротов, босс каждые 10 волн, после босса — новая арена.
+    /// • Защита — 15 волн, брейнроты рвутся к пиццерии Нонны, боссы на 5, 10 и 15 волне.
     /// В конце начисляет кристаллы мозга для Лаборатории.
     /// </summary>
     public class GameManager : MonoBehaviour
@@ -20,6 +23,7 @@ namespace BrainrotWaves
         public WeaponSystem Weapons { get; private set; }
         public HeroAbility Ability { get; private set; }
         public Enemy Boss { get; private set; }
+        public DefenseObjective Objective { get; private set; }
         public int WaveNumber { get; private set; }
         public string StatusTitle { get; private set; } = "";
         public string StatusSubtitle { get; private set; } = "";
@@ -30,7 +34,9 @@ namespace BrainrotWaves
         GameUI ui;
         Light sun;
         Camera cam;
+        Light flashlight;
         ArenaGenerator arena;
+        BrainrotInfo arenaOwner;
         bool paused;
         bool gameOver;
         bool choosing;
@@ -43,7 +49,7 @@ namespace BrainrotWaves
         {
             Instance = this;
             GameSettings.EnsureLoaded();
-            if (!RunState.started) RunState.StartNew(BrainrotId.Tralalero);
+            if (!RunState.started) RunState.StartNew(BrainrotId.Tralalero, GameMode.Story);
             PlayerController.MouseSensitivity = GameSettings.Sensitivity;
             Time.timeScale = 1f;
             Enemy.TimeScale = 1f;
@@ -118,9 +124,23 @@ namespace BrainrotWaves
             vm.farClipPlane = 5f;
             vm.cullingMask = 1 << WeaponSystem.ViewmodelLayer;
             var vmData = vm.GetUniversalAdditionalCameraData();
-            vmData.renderType = UnityEngine.Rendering.Universal.CameraRenderType.Overlay;
+            vmData.renderType = CameraRenderType.Overlay;
             vmData.renderShadows = false;
             cam.GetUniversalAdditionalCameraData().cameraStack.Add(vm);
+
+            // Фонарик (включается на ночной арене)
+            var flash = new GameObject("Flashlight");
+            flash.transform.SetParent(cameraObject.transform, false);
+            flash.transform.localPosition = new Vector3(0.3f, -0.2f, 0f);
+            flashlight = flash.AddComponent<Light>();
+            flashlight.type = LightType.Spot;
+            flashlight.range = 30f;
+            flashlight.spotAngle = 70f;
+            flashlight.innerSpotAngle = 35f;
+            flashlight.intensity = 25f;
+            flashlight.color = new Color(1f, 0.95f, 0.85f);
+            flashlight.shadows = LightShadows.None;
+            flashlight.enabled = false;
 
             Player = playerObject.AddComponent<PlayerController>();
             Player.cameraPivot = pivot;
@@ -163,43 +183,53 @@ namespace BrainrotWaves
 
         IEnumerator RunLoop()
         {
+            switch (RunState.mode)
+            {
+                case GameMode.Survival: yield return SurvivalLoop(); break;
+                case GameMode.Defense: yield return DefenseLoop(); break;
+                default: yield return StoryLoop(); break;
+            }
+        }
+
+        // ===== Сюжет =====
+
+        IEnumerator StoryLoop()
+        {
             while (RunState.arenaIndex < RunState.ArenaCount)
             {
                 var owner = Brainrots.Get(RunState.CurrentArenaOwner);
                 BuildArena(owner);
-                SoundFX.PlayMusic((int)owner.arena);
 
                 ui.ShowBanner(Loc.T("АРЕНА ", "ARENA ") + (RunState.arenaIndex + 1) + " / " + RunState.ArenaCount,
                     owner.arenaName + Loc.T(" · хозяин: ", " · owner: ") + owner.name, 3.5f, owner.themeColor);
 
+                int a = RunState.arenaIndex;
                 for (int wave = 1; wave <= RunState.WavesPerArena; wave++)
                 {
                     WaveNumber = wave;
                     yield return Break(wave == 1 ? 6f : 4f, Loc.T("Волна ", "Wave ") + wave + Loc.T(" через", " in"));
-                    yield return RunWave(owner, wave);
+                    int count = 6 + (wave - 1) * 2 + a * 3;
+                    float hpMult = (1f + 0.12f * (wave - 1) + 0.4f * a) * Meta.ThreatHealth(RunState.threat);
+                    float dmgMult = (1f + 0.05f * (wave - 1) + 0.12f * a) * Meta.ThreatDamage(RunState.threat);
+                    float elite = wave >= 4 ? 0.06f + 0.02f * a : 0f;
+                    int w = wave;
+                    yield return RunWave(count, () => PickStoryEnemy(owner.id, w), hpMult, dmgMult, elite, 10 + a * 2 + RunState.threat,
+                        Loc.T("Волна ", "Wave ") + wave + " / " + RunState.WavesPerArena, owner.shortName + Loc.T(" и компания идут!", " and friends are coming!"), owner.themeColor);
                     if (gameOver) yield break;
+                    if (wave == 2 || wave == 4) SpawnWeaponCrate();
 
-                    RunState.wavesCleared++;
-                    ui.ShowBanner(Loc.T("ВОЛНА ", "WAVE ") + wave + Loc.T(" ПРОЙДЕНА!", " CLEARED!"),
-                        wave < RunState.WavesPerArena ? "" : Loc.T("Готовься к боссу...", "Get ready for the boss..."), 2f, UIKit.Green);
-                    MagnetizeCoins();
-                    SoundFX.Play(SoundFX.Sfx.WaveStart, 0.6f);
-                    yield return new WaitForSeconds(1.2f);
+                    yield return WaveCleared(wave, wave < RunState.WavesPerArena ? "" : Loc.T("Готовься к боссу...", "Get ready for the boss..."));
                     yield return ChooseUpgrade();
                 }
 
-                // Босс
+                // Босс: заметно живучее, с фазами ярости и щитом
                 WaveNumber = RunState.WavesPerArena + 1;
                 yield return Break(4f, Loc.T("Босс через", "Boss in"));
-                yield return RunBoss(owner);
+                float bossHealth = 5000f * (1f + 0.6f * a) * Meta.ThreatHealth(RunState.threat);
+                float bossDmg = (1.2f + 0.12f * a) * Meta.ThreatDamage(RunState.threat);
+                yield return RunBoss(owner, bossHealth, bossDmg, Mathf.Max(5f, 9f - a), 1f + 0.4f * a);
                 if (gameOver) yield break;
-
-                RunState.bossesKilled++;
-                MagnetizeCoins();
-                Player.Health.Heal(Player.Health.maxHealth * 0.5f);
-                SoundFX.Play(SoundFX.Sfx.Victory, 0.8f);
-                ui.ShowBanner(Loc.T("БОСС ПОВЕРЖЕН!", "BOSS DEFEATED!"), owner.name + Loc.T(" больше не хозяин арены", " no longer owns this arena"), 3f, UIKit.Accent);
-                yield return new WaitForSeconds(3f);
+                yield return BossDefeated(owner, owner.name + Loc.T(" больше не хозяин арены", " no longer owns this arena"));
 
                 if (RunState.arenaIndex >= RunState.ArenaCount - 1)
                 {
@@ -212,10 +242,162 @@ namespace BrainrotWaves
             }
         }
 
+        BrainrotId PickStoryEnemy(BrainrotId owner, int wave)
+        {
+            if (RunState.arenaIndex == 0 && wave <= 2) return owner;
+            var pool = new List<BrainrotId>();
+            foreach (var info in Brainrots.Story)
+            {
+                if (info.id == RunState.hero) continue;
+                int weight = info.id == owner ? 4 : 1;
+                for (int i = 0; i < weight; i++) pool.Add(info.id);
+            }
+            return pool[Random.Range(0, pool.Count)];
+        }
+
+        // ===== Выживание =====
+
+        IEnumerator SurvivalLoop()
+        {
+            var owner = Brainrots.Get(RunState.CurrentArenaOwner);
+            BuildArena(owner);
+            ui.ShowBanner(Loc.T("ВЫЖИВАНИЕ", "SURVIVAL"), Loc.T("Сколько волн ты продержишься?", "How many waves can you last?"), 3.5f, UIKit.Pink);
+
+            for (int wave = 1; ; wave++)
+            {
+                WaveNumber = wave;
+                yield return Break(wave == 1 ? 6f : 4f, Loc.T("Волна ", "Wave ") + wave + Loc.T(" через", " in"));
+
+                if (wave % 10 == 0)
+                {
+                    // Каждая десятая волна — случайный босс из всех брейнротов
+                    var bossInfo = RandomBoss();
+                    int n = wave / 10;
+                    float hp = 4000f * (1f + 0.5f * (n - 1)) * (1f + 0.06f * wave);
+                    float dmg = 1.2f + 0.06f * wave;
+                    yield return RunBoss(bossInfo, hp, dmg, Mathf.Max(4f, 8f - n), 1f + 0.08f * wave);
+                    if (gameOver) yield break;
+                    RunState.wavesCleared++;
+                    yield return BossDefeated(bossInfo, Loc.T("Новая арена впереди!", "A new arena awaits!"));
+                    yield return Shop();
+                    // После босса — новая арена
+                    var next = (ArenaTheme)(((int)arenaOwner.arena + 1 + Random.Range(0, 5)) % 6);
+                    foreach (var s in Brainrots.Story) if (s.arena == next) owner = s;
+                    BuildArena(owner);
+                    ui.ShowBanner(owner.arenaName, Loc.T("Волна ", "Wave ") + (wave + 1), 3f, owner.themeColor);
+                    continue;
+                }
+
+                int count = 6 + Mathf.RoundToInt(wave * 1.7f);
+                float hpMult = 1f + 0.12f * (wave - 1) + 0.004f * wave * wave;
+                float dmgMult = 1f + 0.05f * (wave - 1);
+                float elite = wave >= 3 ? Mathf.Min(0.25f, 0.02f * wave) : 0f;
+                int maxAlive = Mathf.Min(26, 10 + wave / 2);
+                int w = wave;
+                yield return RunWave(count, () => PickModeEnemy(w), hpMult, dmgMult, elite, maxAlive,
+                    Loc.T("Волна ", "Wave ") + wave, Loc.T("Рекорд: ", "Best: ") + Meta.P.bestSurvivalWave, UIKit.Pink);
+                if (gameOver) yield break;
+                if (wave % 4 == 2) SpawnWeaponCrate();
+                yield return WaveCleared(wave, (wave + 1) % 10 == 0 ? Loc.T("Готовься к боссу...", "Get ready for the boss...") : "");
+                yield return ChooseUpgrade();
+                if (wave % 5 == 0) yield return Shop();
+            }
+        }
+
+        // ===== Защита =====
+
+        IEnumerator DefenseLoop()
+        {
+            var owner = Brainrots.Get(RunState.CurrentArenaOwner);
+            BuildArena(owner);
+            Objective = DefenseObjective.Create(Vector3.zero);
+            Objective.DestroyedEvent += () => StartCoroutine(Defeat(Loc.T("ПИЦЦЕРИЮ РАЗРУШИЛИ!", "THE PIZZERIA IS DESTROYED!")));
+            Player.Teleport(new Vector3(0f, 0.1f, -6f), 0f);
+            ui.ShowBanner(Loc.T("ЗАЩИТА ПИЦЦЕРИИ", "DEFEND THE PIZZERIA"), Loc.T("Не дай брейнротам разрушить печь Нонны!", "Don't let the brainrots wreck Nonna's oven!"), 4f, UIKit.Accent);
+
+            for (int wave = 1; wave <= RunState.DefenseWaves; wave++)
+            {
+                WaveNumber = wave;
+                yield return Break(wave == 1 ? 8f : 5f, Loc.T("Волна ", "Wave ") + wave + Loc.T(" через", " in"));
+
+                int count = 8 + Mathf.RoundToInt(wave * 1.8f);
+                float hpMult = 1f + 0.13f * (wave - 1);
+                float dmgMult = 1f + 0.05f * (wave - 1);
+                float elite = wave >= 3 ? Mathf.Min(0.2f, 0.015f * wave) : 0f;
+                int w = wave;
+
+                if (wave % 5 == 0)
+                {
+                    // Босс вместе с обычной волной
+                    var bossInfo = RandomBoss();
+                    float hp = 3500f * (1f + 0.35f * (wave / 5 - 1)) * (1f + 0.04f * wave);
+                    StartCoroutine(RunWave(count / 2, () => PickModeEnemy(w), hpMult, dmgMult, elite, 12, "", "", UIKit.Pink, true));
+                    yield return RunBoss(bossInfo, hp, 1.2f + 0.05f * wave, 7f, hpMult);
+                    if (gameOver) yield break;
+                    RunState.wavesCleared++;
+                    if (wave == RunState.DefenseWaves)
+                    {
+                        yield return BossDefeated(bossInfo, Loc.T("Пиццерия спасена!", "The pizzeria is saved!"));
+                        yield return Victory();
+                        yield break;
+                    }
+                    yield return BossDefeated(bossInfo, Loc.T("Печь Нонны выстояла!", "Nonna's oven stands!"));
+                    Objective.Repair(0.25f);
+                    yield return ChooseUpgrade();
+                    yield return Shop();
+                    continue;
+                }
+
+                yield return RunWave(count, () => PickModeEnemy(w), hpMult, dmgMult, elite, Mathf.Min(22, 10 + wave),
+                    Loc.T("Волна ", "Wave ") + wave + " / " + RunState.DefenseWaves, Loc.T("Защити пиццерию!", "Defend the pizzeria!"), UIKit.Accent);
+                if (gameOver) yield break;
+                Objective.Repair(0.05f);
+                if (wave % 4 == 2) SpawnWeaponCrate();
+                yield return WaveCleared(wave, (wave + 1) % 5 == 0 ? Loc.T("Готовься к боссу...", "Get ready for the boss...") : "");
+                yield return ChooseUpgrade();
+            }
+        }
+
+        /// <summary>
+        /// Враги выживания и защиты: все 26 брейнротов, новые архетипы появляются постепенно
+        /// (как в Brotato: сначала простые, потом снайперы, танки и призыватели).
+        /// </summary>
+        BrainrotId PickModeEnemy(int wave)
+        {
+            var pool = new List<BrainrotId>();
+            foreach (var info in Brainrots.All)
+            {
+                if (info.id == RunState.hero) continue;
+                int minWave;
+                switch (info.behavior)
+                {
+                    case EnemyBehavior.Runner: case EnemyBehavior.Chaser: case EnemyBehavior.Dasher: minWave = 1; break;
+                    case EnemyBehavior.Thrower: case EnemyBehavior.Leaper: case EnemyBehavior.Flyer: minWave = 3; break;
+                    case EnemyBehavior.Exploder: case EnemyBehavior.Teleporter: minWave = 5; break;
+                    default: minWave = 7; break; // танки, снайперы, призыватели
+                }
+                if (wave < minWave) continue;
+                pool.Add(info.id);
+                if (info.arena == arenaOwner.arena) pool.Add(info.id); // местные чаще
+            }
+            if (pool.Count == 0) pool.Add(BrainrotId.TrippiTroppi);
+            return pool[Random.Range(0, pool.Count)];
+        }
+
+        BrainrotInfo RandomBoss()
+        {
+            var list = new List<BrainrotInfo>();
+            foreach (var info in Brainrots.All) if (info.id != RunState.hero && info.behavior != EnemyBehavior.Exploder) list.Add(info);
+            return list[Random.Range(0, list.Count)];
+        }
+
+        // ===== Общее =====
+
         void BuildArena(BrainrotInfo owner)
         {
             arena?.Destroy();
             ClearLeftovers();
+            arenaOwner = owner;
             arena = new ArenaGenerator(ArenaHalfSize);
             arena.Build(owner.arena, sun, cam);
             if (sun != null) sun.shadows = GameSettings.SunShadows;
@@ -223,7 +405,9 @@ namespace BrainrotWaves
             Boss = null;
             Particles.Ambient(owner.arena, Player.transform);
             SoundFX.PlayAmbient(owner.arena);
+            Music.NewArena(owner.arena);
             if (PostFX.Instance != null) PostFX.Instance.ApplyTheme(owner.arena);
+            flashlight.enabled = owner.arena == ArenaTheme.NightVillage;
         }
 
         void ClearLeftovers()
@@ -242,6 +426,7 @@ namespace BrainrotWaves
         IEnumerator Break(float seconds, string label)
         {
             breakTimeLeft = seconds;
+            Music.Break();
             while (breakTimeLeft > 0f)
             {
                 breakTimeLeft -= Time.deltaTime;
@@ -251,53 +436,77 @@ namespace BrainrotWaves
             }
         }
 
-        string ArenaLine() => Brainrots.Get(RunState.CurrentArenaOwner).arenaName + Loc.T(" · арена ", " · arena ") + (RunState.arenaIndex + 1) + "/" + RunState.ArenaCount
-                              + (RunState.threat > 0 ? Loc.T(" · угроза ", " · threat ") + RunState.threat : "");
-
-        IEnumerator RunWave(BrainrotInfo owner, int wave)
+        string ArenaLine()
         {
-            int a = RunState.arenaIndex;
-            toSpawn = 6 + (wave - 1) * 2 + a * 3;
-            float hpMult = (1f + 0.12f * (wave - 1) + 0.4f * a) * Meta.ThreatHealth(RunState.threat);
-            float dmgMult = (1f + 0.05f * (wave - 1) + 0.12f * a) * Meta.ThreatDamage(RunState.threat);
-            int maxAlive = 10 + a * 2 + RunState.threat;
+            string arenaName = arenaOwner != null ? (string)arenaOwner.arenaName : "";
+            switch (RunState.mode)
+            {
+                case GameMode.Survival: return Loc.T("Выживание · ", "Survival · ") + arenaName + Loc.T(" · рекорд: волна ", " · best: wave ") + Meta.P.bestSurvivalWave;
+                case GameMode.Defense: return Loc.T("Защита · ", "Defense · ") + arenaName;
+                default:
+                    return arenaName + Loc.T(" · арена ", " · arena ") + (RunState.arenaIndex + 1) + "/" + RunState.ArenaCount
+                           + (RunState.threat > 0 ? Loc.T(" · угроза ", " · threat ") + RunState.threat : "");
+            }
+        }
 
-            SoundFX.Play(SoundFX.Sfx.WaveStart, 0.8f);
-            ui.ShowBanner(Loc.T("ВОЛНА ", "WAVE ") + wave, owner.shortName + Loc.T(" и компания идут!", " and friends are coming!"), 2f, owner.themeColor);
-
-            // Ящик с оружием на 2-й и 4-й волне
-            if (wave == 2 || wave == 4) SpawnWeaponCrate();
+        /// <summary>Волна: спавнит врагов из порталов, пока не кончатся.</summary>
+        IEnumerator RunWave(int count, System.Func<BrainrotId> pick, float hpMult, float dmgMult, float eliteChance, int maxAlive,
+            string title, string subtitle, Color color, bool silent = false)
+        {
+            toSpawn = count;
+            if (!silent)
+            {
+                SoundFX.Play(SoundFX.Sfx.WaveStart, 0.8f);
+                ui.ShowBanner(title.ToUpperInvariant(), subtitle, 2f, color);
+                Music.WaveStart();
+            }
 
             float spawnTimer = 0f;
-            while (toSpawn > 0 || Enemy.Active.Count > 0)
+            int a = RunState.mode == GameMode.Story ? RunState.arenaIndex : Mathf.Min(4, WaveNumber / 6);
+            while (toSpawn > 0 || (!silent && Enemy.Active.Count > 0))
             {
                 if (gameOver) yield break;
                 spawnTimer -= Time.deltaTime;
                 if (toSpawn > 0 && spawnTimer <= 0f && Enemy.Active.Count < maxAlive)
                 {
-                    var id = PickEnemyType(owner.id, wave);
+                    var id = pick();
                     var info = Brainrots.Get(id);
-                    Enemy.Create(id, PickSpawnPoint(), false, info.enemyHealth * hpMult, dmgMult);
-                    toSpawn--;
-                    spawnTimer = Mathf.Max(0.35f, 0.9f - a * 0.1f);
+                    Vector3 point = PickSpawnPoint();
+                    bool elite = Random.value < eliteChance;
+                    // Бегуны-«стайники» приходят по трое
+                    int pack = info.behavior == EnemyBehavior.Runner && WaveNumber >= 3 && !elite ? Mathf.Min(3, toSpawn) : 1;
+                    for (int i = 0; i < pack; i++)
+                        Enemy.Create(id, point + new Vector3(Random.Range(-1.5f, 1.5f), 0f, Random.Range(-1.5f, 1.5f)), false, info.enemyHealth * hpMult, dmgMult, elite);
+                    toSpawn -= pack;
+                    spawnTimer = Mathf.Max(0.3f, 0.9f - a * 0.1f);
                 }
-                StatusTitle = Loc.T("Волна ", "Wave ") + wave + " / " + RunState.WavesPerArena;
-                StatusSubtitle = Loc.T("Осталось врагов: ", "Enemies left: ") + (toSpawn + Enemy.Active.Count) + " · " + Brainrots.Get(RunState.CurrentArenaOwner).arenaName;
+                if (!silent)
+                {
+                    StatusTitle = title;
+                    StatusSubtitle = Loc.T("Осталось врагов: ", "Enemies left: ") + (toSpawn + Enemy.Active.Count) + " · " + ArenaLine();
+                }
                 yield return null;
             }
         }
 
-        BrainrotId PickEnemyType(BrainrotId owner, int wave)
+        IEnumerator WaveCleared(int wave, string subtitle)
         {
-            if (RunState.arenaIndex == 0 && wave <= 2) return owner;
-            var pool = new List<BrainrotId>();
-            foreach (var info in Brainrots.All)
-            {
-                if (info.id == RunState.hero) continue;
-                int weight = info.id == owner ? 4 : 1;
-                for (int i = 0; i < weight; i++) pool.Add(info.id);
-            }
-            return pool[Random.Range(0, pool.Count)];
+            RunState.wavesCleared++;
+            ui.ShowBanner(Loc.T("ВОЛНА ", "WAVE ") + wave + Loc.T(" ПРОЙДЕНА!", " CLEARED!"), subtitle, 2f, UIKit.Green);
+            MagnetizeCoins();
+            SoundFX.Play(SoundFX.Sfx.WaveStart, 0.6f);
+            yield return new WaitForSeconds(1.2f);
+        }
+
+        IEnumerator BossDefeated(BrainrotInfo info, string subtitle)
+        {
+            RunState.bossesKilled++;
+            MagnetizeCoins();
+            Player.Health.Heal(Player.Health.maxHealth * 0.5f);
+            SoundFX.Play(SoundFX.Sfx.Victory, 0.8f);
+            Music.Calm();
+            ui.ShowBanner(Loc.T("БОСС ПОВЕРЖЕН!", "BOSS DEFEATED!"), subtitle, 3f, UIKit.Accent);
+            yield return new WaitForSeconds(3f);
         }
 
         Vector3 PickSpawnPoint()
@@ -317,40 +526,37 @@ namespace BrainrotWaves
             if (!Weapons.Has(WeaponId.Shotgun)) missing.Add(WeaponId.Shotgun);
             if (missing.Count == 0 || Random.value > 0.6f) return;
             Vector3 pos = new Vector3(Random.Range(-12f, 12f), 0.5f, Random.Range(-12f, 12f));
+            if (Objective != null && pos.magnitude < 5f) pos = pos.normalized * 7f + Vector3.up * 0.5f;
             if (UnityEngine.AI.NavMesh.SamplePosition(pos, out var hit, 6f, UnityEngine.AI.NavMesh.AllAreas)) pos = hit.position + Vector3.up * 0.5f;
             Pickup.Spawn(Pickup.Kind.WeaponCrate, pos, 1, missing[Random.Range(0, missing.Count)]);
             ui.ShowBanner("", Loc.T("На арене появился ящик с оружием!", "A weapon crate appeared in the arena!"), 2.5f);
         }
 
-        IEnumerator RunBoss(BrainrotInfo owner)
+        /// <summary>Бой с боссом: заставка, потом босс с фазами ярости и подкреплением.</summary>
+        IEnumerator RunBoss(BrainrotInfo bossInfo, float bossHealth, float dmgMult, float minionEvery, float minionHp)
         {
-            int a = RunState.arenaIndex;
-            float bossHealth = 1200f * (1f + 0.55f * a) * Meta.ThreatHealth(RunState.threat);
-            float dmgMult = (1f + 0.2f + 0.12f * a) * Meta.ThreatDamage(RunState.threat);
-
-            SoundFX.PlayMusic(100 + (int)owner.arena);
-
+            Music.Boss();
             Vector3 spawn = PickSpawnPoint();
-            Boss = Enemy.Create(owner.id, spawn, true, bossHealth, dmgMult);
-            yield return BossIntro(Boss, owner);
+            Boss = Enemy.Create(bossInfo.id, spawn, true, bossHealth, dmgMult);
+            yield return BossIntro(Boss, bossInfo);
             if (gameOver) yield break;
 
-            float minionTimer = 8f;
+            float minionTimer = minionEvery;
             while (Boss != null && !Boss.IsDead)
             {
                 if (gameOver) yield break;
                 minionTimer -= Time.deltaTime;
                 if (minionTimer <= 0f && Enemy.Active.Count < 8)
                 {
-                    minionTimer = Mathf.Max(5f, 9f - a);
+                    minionTimer = minionEvery;
                     for (int i = 0; i < 2; i++)
                     {
-                        var id = PickEnemyType(owner.id, 5);
+                        var id = RunState.mode == GameMode.Story ? PickStoryEnemy(bossInfo.id, 5) : PickModeEnemy(WaveNumber);
                         var info = Brainrots.Get(id);
-                        Enemy.Create(id, PickSpawnPoint(), false, info.enemyHealth * (1f + 0.4f * a) * Meta.ThreatHealth(RunState.threat), (1f + 0.12f * a) * Meta.ThreatDamage(RunState.threat));
+                        Enemy.Create(id, PickSpawnPoint(), false, info.enemyHealth * minionHp, 1f + 0.1f * RunState.arenaIndex);
                     }
                 }
-                StatusTitle = Loc.T("БИТВА С БОССОМ", "BOSS FIGHT");
+                StatusTitle = Loc.T("БИТВА С БОССОМ", "BOSS FIGHT") + (Boss.BossPhase > 0 ? Loc.T(" · ЯРОСТЬ ", " · RAGE ") + Boss.BossPhase : "");
                 StatusSubtitle = ArenaLine();
                 yield return null;
             }
@@ -369,7 +575,14 @@ namespace BrainrotWaves
             // Остальные враги разбегаются
             foreach (var e in new List<Enemy>(Enemy.Active))
                 if (e != null && !e.IsDead) e.TakeHit(99999f, false, e.transform.position + Vector3.up);
-            SoundFX.PlayMusic((int)owner.arena);
+        }
+
+        /// <summary>Босс впал в ярость (фаза 2 или 3).</summary>
+        public void OnBossRage(Enemy boss)
+        {
+            if (ui == null) return;
+            ui.ShowBanner(Loc.T("БОСС В ЯРОСТИ!", "THE BOSS IS ENRAGED!"),
+                Loc.T("Щит! Убей помощников, пока он не спадёт", "Shield up! Kill the minions while it lasts"), 2.5f, UIKit.Pink);
         }
 
         /// <summary>
@@ -485,20 +698,20 @@ namespace BrainrotWaves
                 if (p != null && p.kind == Pickup.Kind.Coin) p.Magnetize();
         }
 
-        /// <summary>Вызывается боссом: призвать помощников рядом с ним.</summary>
-        public void SummonMinions(BrainrotId bossId, Vector3 near, int count)
+        /// <summary>Призвать помощников рядом с точкой (боссы и призыватели).</summary>
+        public void SummonMinions(BrainrotId id, Vector3 near, int count)
         {
-            int a = RunState.arenaIndex;
+            int a = RunState.mode == GameMode.Story ? RunState.arenaIndex : Mathf.Min(4, WaveNumber / 6);
             for (int i = 0; i < count; i++)
             {
-                if (Enemy.Active.Count >= 12) return;
+                if (Enemy.Active.Count >= 26) return;
                 Vector3 offset = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward * Random.Range(3f, 6f);
                 Vector3 pos = near + offset;
                 pos.y = 0f;
                 pos.x = Mathf.Clamp(pos.x, -ArenaHalfSize + 3f, ArenaHalfSize - 3f);
                 pos.z = Mathf.Clamp(pos.z, -ArenaHalfSize + 3f, ArenaHalfSize - 3f);
-                var info = Brainrots.Get(bossId);
-                Enemy.Create(bossId, pos, false, info.enemyHealth * (0.8f + 0.4f * a) * Meta.ThreatHealth(RunState.threat), (1f + 0.1f * a) * Meta.ThreatDamage(RunState.threat));
+                var info = Brainrots.Get(id);
+                Enemy.Create(id, pos, false, info.enemyHealth * (0.8f + 0.4f * a) * Meta.ThreatHealth(RunState.threat), (1f + 0.1f * a) * Meta.ThreatDamage(RunState.threat));
             }
         }
 
@@ -510,6 +723,7 @@ namespace BrainrotWaves
             AudioListener.pause = false;
             Player.InputEnabled = false;
             PlayerController.LockCursor(false);
+            Music.Duck(true);
         }
 
         void CloseScreen()
@@ -518,6 +732,7 @@ namespace BrainrotWaves
             Time.timeScale = 1f;
             Player.InputEnabled = !CutsceneActive;
             PlayerController.LockCursor(true);
+            Music.Duck(false);
         }
 
         IEnumerator ChooseUpgrade()
@@ -560,9 +775,8 @@ namespace BrainrotWaves
             choosing = true;
             bool done = false;
             OpenScreen();
-            SoundFX.PlayMusic(SoundFX.MenuMusic);
             var counts = new Dictionary<string, int>();
-            int a = RunState.arenaIndex;
+            int a = RunState.mode == GameMode.Story ? RunState.arenaIndex : WaveNumber / 5;
 
             int Price(string key, int basePrice)
             {
@@ -597,12 +811,30 @@ namespace BrainrotWaves
                     color = UIKit.Green, icon = IconKind.Plus, soldOut = Player.Health.Current >= Player.Health.maxHealth,
                     buy = () => { Player.Health.HealFull(); Count("heal"); return true; }
                 });
-                list.Add(new GameUI.ShopItem
+                if (Objective != null)
                 {
-                    name = Loc.T("Здоровье +25", "Health +25"), description = Loc.T("Увеличить максимум\nздоровья на 25", "Increase max\nhealth by 25"), price = Price("hp", 40),
-                    color = UIKit.Green, icon = IconKind.Heart,
-                    buy = () => { RunState.stats.bonusMaxHealth += 25f; Player.ApplyStats(false); Player.Health.Heal(25f); Count("hp"); return true; }
-                });
+                    list.Add(new GameUI.ShopItem
+                    {
+                        name = Loc.T("Ремонт печи", "Repair oven"), description = Loc.T("Восстановить пиццерии\n40% прочности", "Restore 40% of\nthe pizzeria's health"), price = Price("repair", 30),
+                        color = UIKit.Accent, icon = IconKind.Home, soldOut = Objective.Fraction >= 0.999f,
+                        buy = () => { Objective.Repair(0.4f); Count("repair"); return true; }
+                    });
+                    list.Add(new GameUI.ShopItem
+                    {
+                        name = Loc.T("Укрепить печь", "Fortify oven"), description = Loc.T("Пиццерия получает\nна 20% меньше урона", "The pizzeria takes\n20% less damage"), price = Price("armor", 60),
+                        color = UIKit.Accent, icon = IconKind.Shield,
+                        buy = () => { Objective.Armor *= 0.8f; Count("armor"); return true; }
+                    });
+                }
+                else
+                {
+                    list.Add(new GameUI.ShopItem
+                    {
+                        name = Loc.T("Здоровье +25", "Health +25"), description = Loc.T("Увеличить максимум\nздоровья на 25", "Increase max\nhealth by 25"), price = Price("hp", 40),
+                        color = UIKit.Green, icon = IconKind.Heart,
+                        buy = () => { RunState.stats.bonusMaxHealth += 25f; Player.ApplyStats(false); Player.Health.Heal(25f); Count("hp"); return true; }
+                    });
+                }
                 list.Add(new GameUI.ShopItem
                 {
                     name = Loc.T("Урон +15%", "Damage +15%"), description = Loc.T("Все пули и взрывы\nбьют сильнее", "All bullets and\nexplosions hit harder"), price = Price("dmg", 50),
@@ -611,7 +843,7 @@ namespace BrainrotWaves
                 });
                 list.Add(new GameUI.ShopItem
                 {
-                    name = Loc.T("Способность −20%", "Ability −20%"), description = Loc.T("Способность\nперезаряжается быстрее", "Your ability\nrecharges faster"), price = Price("cd", 45),
+                    name = Loc.T("Навыки −20%", "Skills −20%"), description = Loc.T("Навыки Q и E\nперезаряжаются быстрее", "Q and E skills\nrecharge faster"), price = Price("cd", 45),
                     color = UIKit.Accent, icon = IconKind.Bolt,
                     buy = () => { RunState.stats.abilityCooldownMultiplier *= 0.8f; Count("cd"); return true; }
                 });
@@ -636,7 +868,7 @@ namespace BrainrotWaves
                 StartCoroutine(Revive());
                 return;
             }
-            StartCoroutine(Defeat());
+            StartCoroutine(Defeat(null));
         }
 
         IEnumerator Revive()
@@ -668,13 +900,14 @@ namespace BrainrotWaves
             return Meta.FinishRun(victory);
         }
 
-        IEnumerator Defeat()
+        IEnumerator Defeat(string reason)
         {
             if (gameOver) yield break;
             gameOver = true;
             Boss = null;
-            SoundFX.StopMusic();
+            Music.Stop(0.5f);
             SoundFX.Play(SoundFX.Sfx.Defeat, 1f, 0f);
+            if (!string.IsNullOrEmpty(reason)) ui.ShowBanner(reason, "", 2f, UIKit.Pink);
             Time.timeScale = 0.3f;
             yield return new WaitForSecondsRealtime(1.5f);
             var reward = FinishRun(false);
@@ -686,7 +919,8 @@ namespace BrainrotWaves
         {
             gameOver = true;
             SoundFX.Play(SoundFX.Sfx.Victory, 1f, 0f);
-            ui.ShowBanner(Loc.T("ПОБЕДА!", "VICTORY!"), Loc.T("Все брейнроты повержены!", "All brainrots defeated!"), 3f, UIKit.Accent);
+            Music.Calm();
+            ui.ShowBanner(Loc.T("ПОБЕДА!", "VICTORY!"), RunState.mode == GameMode.Defense ? Loc.T("Пиццерия Нонны спасена!", "Nonna's pizzeria is saved!") : Loc.T("Все брейнроты повержены!", "All brainrots defeated!"), 3f, UIKit.Accent);
             yield return new WaitForSeconds(2.5f);
             var reward = FinishRun(true);
             OpenScreen();
@@ -696,7 +930,7 @@ namespace BrainrotWaves
         void Retry()
         {
             if (SceneLoader.Busy) return;
-            RunState.StartNew(RunState.hero, RunState.threat);
+            RunState.StartNew(RunState.hero, RunState.mode, RunState.threat);
             SceneLoader.Load("Game");
         }
 
