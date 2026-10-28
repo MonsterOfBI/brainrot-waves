@@ -1,0 +1,49 @@
+{
+ "id": "defense_pizzeria_en_h",
+ "mode": "Defense",
+ "hero": "Chimpanzini",
+ "arenaOwner": "Patapim",
+ "weapon": "Rifle",
+ "status": "Wave 7 / 15",
+ "statusSub": "Enemies left: {n} · {arena}",
+ "waveNumber": 7,
+ "bannerTitle": "DEFEND THE PIZZERIA",
+ "bannerSubtitle": "Don't let the brainrots wreck Nonna's oven!",
+ "bannerAt": 0.2,
+ "enemies": [
+  "Patapim",
+  "Glorbo",
+  "Bombombini",
+  "Boneca",
+  "Lirili"
+ ],
+ "initialCount": 12,
+ "spawnEvery": 0.5,
+ "spawnPack": 2,
+ "maxAlive": 24,
+ "distMin": 9,
+ "distMax": 20,
+ "arc": 110,
+ "spawnCenter": {
+  "x": 0,
+  "y": 0,
+  "z": 4
+ },
+ "playerPos": {
+  "x": -5,
+  "y": 0.1,
+  "z": -10
+ },
+ "playerYaw": 22,
+ "keepAway": 4,
+ "damage": 1.6,
+ "warmup": 1.0,
+ "duration": 6.0,
+ "seed": 13,
+ "scene": "Game",
+ "lang": "EN",
+ "fps": 60,
+ "width": 1920,
+ "height": 1080,
+ "outDir": "Logs/Trailer/out"
+}

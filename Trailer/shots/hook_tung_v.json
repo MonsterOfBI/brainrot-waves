@@ -1,0 +1,40 @@
+{
+ "id": "hook_tung_v",
+ "hero": "Tralalero",
+ "arenaOwner": "TungTung",
+ "weapon": "Shotgun",
+ "hud": false,
+ "boss": "TungTung",
+ "bossDirect": true,
+ "bossPos": {
+  "x": 0,
+  "y": 0,
+  "z": 9
+ },
+ "bossHealth": 999999,
+ "preferBoss": true,
+ "enemies": [
+  "TungTung",
+  "TaTaSahur"
+ ],
+ "initialCount": 4,
+ "spawnEvery": 0.8,
+ "spawnPack": 1,
+ "maxAlive": 7,
+ "distMin": 8,
+ "distMax": 14,
+ "arc": 50,
+ "keepAway": 2.5,
+ "damage": 0.6,
+ "aimSmooth": 0.14,
+ "warmup": 0.4,
+ "duration": 4.5,
+ "seed": 4,
+ "scene": "Game",
+ "mode": "Story",
+ "lang": "EN",
+ "fps": 60,
+ "width": 1080,
+ "height": 1920,
+ "outDir": "Logs/Trailer/out"
+}

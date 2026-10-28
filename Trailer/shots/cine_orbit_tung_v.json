@@ -1,0 +1,49 @@
+{
+ "id": "cine_orbit_tung_v",
+ "hero": "Tralalero",
+ "arenaOwner": "TungTung",
+ "hud": false,
+ "camera": "orbit",
+ "boss": "TungTung",
+ "bossDirect": true,
+ "bossPos": {
+  "x": 0,
+  "y": 0,
+  "z": 8
+ },
+ "bossHealth": 999999,
+ "lookAtBoss": true,
+ "orbitRadius": 17.25,
+ "orbitHeight": 4.5,
+ "orbitDegrees": 60,
+ "orbitStart": -25,
+ "camFov": 64.8,
+ "enemies": [
+  "TaTaSahur",
+  "Girafa"
+ ],
+ "initialCount": 6,
+ "spawnEvery": 0.8,
+ "spawnPack": 1,
+ "maxAlive": 8,
+ "spawnCenter": {
+  "x": 0,
+  "y": 0,
+  "z": 8
+ },
+ "distMin": 3,
+ "distMax": 8,
+ "arc": 360,
+ "killEvery": 0.8,
+ "shoot": false,
+ "warmup": 0.6,
+ "duration": 5.0,
+ "seed": 9,
+ "scene": "Game",
+ "mode": "Story",
+ "lang": "EN",
+ "fps": 60,
+ "width": 1080,
+ "height": 1920,
+ "outDir": "Logs/Trailer/out"
+}
