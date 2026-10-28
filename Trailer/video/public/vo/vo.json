@@ -1,0 +1,76 @@
+{
+ "EN": [
+  {
+   "n": 1,
+   "text": "Tung... tung... tung...",
+   "duration": 2.56
+  },
+  {
+   "n": 2,
+   "text": "They come in waves.",
+   "duration": 1.52
+  },
+  {
+   "n": 3,
+   "text": "Blast hordes of Italian brainrots across six crazy arenas!",
+   "duration": 4.56
+  },
+  {
+   "n": 4,
+   "text": "Play as twenty-six brainrots, each with its own skill.",
+   "duration": 3.68
+  },
+  {
+   "n": 5,
+   "text": "Survive giant bosses... Bombardiro Crocodilo!",
+   "duration": 4.16
+  },
+  {
+   "n": 6,
+   "text": "Story. Survival. Defend Nonna's pizzeria!",
+   "duration": 4.16
+  },
+  {
+   "n": 7,
+   "text": "Brainrot Waves. Play free in your browser!",
+   "duration": 2.96
+  }
+ ],
+ "RU": [
+  {
+   "n": 1,
+   "text": "Тунг... тунг... тунг...",
+   "duration": 3.52
+  },
+  {
+   "n": 2,
+   "text": "Они идут волнами.",
+   "duration": 1.68
+  },
+  {
+   "n": 3,
+   "text": "Отстреливай орды итальянских брейнротов на шести безумных аренах!",
+   "duration": 4.72
+  },
+  {
+   "n": 4,
+   "text": "Двадцать шесть героев — у каждого свой навык.",
+   "duration": 3.36
+  },
+  {
+   "n": 5,
+   "text": "Выживи против гигантских боссов... Бомбардиро Крокодило!",
+   "duration": 4.32
+  },
+  {
+   "n": 6,
+   "text": "Сюжет. Выживание. Защити пиццерию Нонны!",
+   "duration": 3.92
+  },
+  {
+   "n": 7,
+   "text": "Брейнрот Вейвс. Играй бесплатно прямо в браузере!",
+   "duration": 4.24
+  }
+ ]
+}

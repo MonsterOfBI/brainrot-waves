@@ -1,0 +1,37 @@
+{
+ "id": "ability_vortex_ru_h",
+ "hero": "Tralalero",
+ "arenaOwner": "Patapim",
+ "weapon": "Rifle",
+ "status": "Волна 2 / 5",
+ "statusSub": "Осталось врагов: {n} · {arena}",
+ "waveNumber": 2,
+ "enemies": [
+  "Patapim",
+  "Bombombini",
+  "Glorbo",
+  "Burbaloni"
+ ],
+ "initialCount": 14,
+ "spawnEvery": 0.5,
+ "spawnPack": 2,
+ "maxAlive": 24,
+ "distMin": 10,
+ "distMax": 22,
+ "arc": 70,
+ "abilities": [
+  "E@0.5",
+  "Q@3.0"
+ ],
+ "damage": 1.5,
+ "warmup": 1.0,
+ "duration": 5.0,
+ "seed": 8,
+ "scene": "Game",
+ "mode": "Story",
+ "lang": "RU",
+ "fps": 60,
+ "width": 1920,
+ "height": 1080,
+ "outDir": "Logs/Trailer/out"
+}

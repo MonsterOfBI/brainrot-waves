@@ -1,0 +1,54 @@
+{
+ "id": "cine_fly_city_v",
+ "hero": "Tralalero",
+ "arenaOwner": "Cappuccino",
+ "hud": false,
+ "camera": "dolly",
+ "camFrom": {
+  "x": -16,
+  "y": 10,
+  "z": -22
+ },
+ "camTo": {
+  "x": 7,
+  "y": 5,
+  "z": -10
+ },
+ "lookAt": {
+  "x": 0,
+  "y": 1,
+  "z": 6
+ },
+ "camFov": 74.2,
+ "enemies": [
+  "Cappuccino",
+  "Ballerina",
+  "Bobritto",
+  "ChefCrab",
+  "RhinoToaster"
+ ],
+ "initialCount": 24,
+ "spawnEvery": 0.3,
+ "spawnPack": 2,
+ "maxAlive": 34,
+ "spawnCenter": {
+  "x": 0,
+  "y": 0,
+  "z": 12
+ },
+ "distMin": 3,
+ "distMax": 16,
+ "arc": 360,
+ "killEvery": 0.3,
+ "shoot": false,
+ "warmup": 0.8,
+ "duration": 3.5,
+ "seed": 17,
+ "scene": "Game",
+ "mode": "Story",
+ "lang": "EN",
+ "fps": 60,
+ "width": 1080,
+ "height": 1920,
+ "outDir": "Logs/Trailer/out"
+}

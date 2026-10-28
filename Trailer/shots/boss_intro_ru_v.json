@@ -1,0 +1,21 @@
+{
+ "id": "boss_intro_ru_v",
+ "hero": "Tralalero",
+ "arenaOwner": "Bombardiro",
+ "weapon": "Rifle",
+ "boss": "Bombardiro",
+ "bossHealth": 6000,
+ "enemies": [],
+ "initialCount": 0,
+ "shoot": false,
+ "warmup": 0.3,
+ "duration": 4.3,
+ "seed": 2,
+ "scene": "Game",
+ "mode": "Story",
+ "lang": "RU",
+ "fps": 60,
+ "width": 1080,
+ "height": 1920,
+ "outDir": "Logs/Trailer/out"
+}

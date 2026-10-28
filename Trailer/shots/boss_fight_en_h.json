@@ -1,0 +1,32 @@
+{
+ "id": "boss_fight_en_h",
+ "hero": "Tralalero",
+ "arenaOwner": "Bombardiro",
+ "weapon": "Rifle",
+ "boss": "Bombardiro",
+ "bossHealth": 6000,
+ "rageAt": 2.2,
+ "preferBoss": true,
+ "enemies": [
+  "Lirili",
+  "Svinino"
+ ],
+ "initialCount": 3,
+ "spawnEvery": 1.6,
+ "spawnPack": 1,
+ "maxAlive": 8,
+ "distMin": 12,
+ "distMax": 20,
+ "arc": 60,
+ "damage": 2.5,
+ "warmup": 4.6,
+ "duration": 6.0,
+ "seed": 2,
+ "scene": "Game",
+ "mode": "Story",
+ "lang": "EN",
+ "fps": 60,
+ "width": 1920,
+ "height": 1080,
+ "outDir": "Logs/Trailer/out"
+}

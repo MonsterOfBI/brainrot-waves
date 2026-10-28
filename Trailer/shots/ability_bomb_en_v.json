@@ -1,0 +1,37 @@
+{
+ "id": "ability_bomb_en_v",
+ "hero": "Bombardiro",
+ "arenaOwner": "Bombardiro",
+ "weapon": "Rifle",
+ "status": "Wave 5 / 5",
+ "statusSub": "Enemies left: {n} · {arena}",
+ "waveNumber": 5,
+ "enemies": [
+  "Lirili",
+  "FrigoCamelo",
+  "CactoHippo",
+  "Svinino"
+ ],
+ "initialCount": 16,
+ "spawnEvery": 0.4,
+ "spawnPack": 2,
+ "maxAlive": 28,
+ "distMin": 12,
+ "distMax": 26,
+ "arc": 60,
+ "abilities": [
+  "Q@0.6",
+  "E@3.2"
+ ],
+ "damage": 1.6,
+ "warmup": 1.0,
+ "duration": 5.5,
+ "seed": 5,
+ "scene": "Game",
+ "mode": "Story",
+ "lang": "EN",
+ "fps": 60,
+ "width": 1080,
+ "height": 1920,
+ "outDir": "Logs/Trailer/out"
+}

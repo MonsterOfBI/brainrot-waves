@@ -1,0 +1,7 @@
+{
+ "id": "portraits",
+ "scene": "Portraits",
+ "lang": "EN",
+ "portraitSize": 1024,
+ "outDir": "Logs/Trailer/out"
+}

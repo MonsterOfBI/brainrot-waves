@@ -1,0 +1,14 @@
+{
+ "id": "menu_roster_en_h",
+ "scene": "MainMenu",
+ "menuMode": "Survival",
+ "menuEvery": 0.17,
+ "warmup": 1.2,
+ "duration": 4.6,
+ "mode": "Story",
+ "lang": "EN",
+ "fps": 60,
+ "width": 1920,
+ "height": 1080,
+ "outDir": "Logs/Trailer/out"
+}
